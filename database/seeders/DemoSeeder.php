@@ -11,6 +11,7 @@ use App\Models\Ambulance;
 use App\Models\Dispatch;
 use App\Models\Hospital;
 use App\Models\User;
+use App\Services\FleetSimulator;
 use Illuminate\Database\Seeder;
 
 class DemoSeeder extends Seeder
@@ -133,5 +134,8 @@ class DemoSeeder extends Seeder
         foreach ($dispatches as $data) {
             Dispatch::updateOrCreate(['code' => $data['code']], $data);
         }
+
+        // Las unidades vuelven a su posición inicial: se descartan las rutas que el simulador tenía guardadas
+        FleetSimulator::reset();
     }
 }
