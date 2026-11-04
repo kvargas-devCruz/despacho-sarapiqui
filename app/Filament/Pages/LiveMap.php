@@ -7,9 +7,11 @@ use App\Enums\DispatchStatus;
 use App\Models\Ambulance;
 use App\Models\Dispatch;
 use App\Models\Hospital;
+use App\Services\FleetSimulator;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Renderless;
 use UnitEnum;
 
@@ -44,6 +46,12 @@ class LiveMap extends Page
     #[Renderless]
     public function getMapData(): array
     {
+        // En modo demo, el simulador avanza mientras alguien tiene el mapa abierto.
+        // El candado evita que varios visitantes lo ejecuten al mismo tiempo.
+        if (config('app.demo') && Cache::add('fleet-simulator:lock', true, 2)) {
+            (new FleetSimulator)->tick();
+        }
+
         $units = Ambulance::query()
             ->with('activeDispatch.hospital')
             ->whereNotNull('latitude')

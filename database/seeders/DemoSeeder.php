@@ -10,12 +10,19 @@ use App\Enums\DispatchType;
 use App\Models\Ambulance;
 use App\Models\Dispatch;
 use App\Models\Hospital;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class DemoSeeder extends Seeder
 {
     public function run(): void
     {
+        // ── Usuario de demostración ──
+        User::updateOrCreate(
+            ['email' => 'demo@despacho.cr'],
+            ['name' => 'Operador de Despacho', 'password' => 'demo1234'],
+        );
+
         // ── Centros de salud de referencia (coordenadas aproximadas) ──
         $hospitals = collect([
             ['name' => 'Área de Salud Puerto Viejo de Sarapiquí', 'short_name' => 'AS Sarapiquí', 'address' => 'Puerto Viejo, Sarapiquí, Heredia', 'latitude' => 10.4568, 'longitude' => -84.0175],

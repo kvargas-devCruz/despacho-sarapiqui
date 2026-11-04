@@ -15,6 +15,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Modo demostración: precarga el login y activa el simulador a demanda
+    'demo' => (bool) env('APP_DEMO', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment
