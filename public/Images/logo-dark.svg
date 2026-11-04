@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 230 40" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <rect width="40" height="40" rx="10" fill="url(#g)"/>
+  <path d="M20 7c-5.8 0-10.5 4.5-10.5 10.2C9.5 24.6 20 33.5 20 33.5s10.5-8.9 10.5-16.3C30.5 11.5 25.8 7 20 7z" fill="#fff"/>
+  <polyline points="13,18 16.5,18 18.5,13.5 21.5,22.5 23.5,18 27,18" stroke="#dc2626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <text x="52" y="19" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="700" fill="#ffffff">Despacho</text>
+  <text x="52" y="34" font-family="Inter, system-ui, sans-serif" font-size="10.5" font-weight="600" letter-spacing="2.6" fill="#2dd4bf">SARAPIQUÍ</text>
+</svg>
