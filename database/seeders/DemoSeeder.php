@@ -135,6 +135,9 @@ class DemoSeeder extends Seeder
             Dispatch::updateOrCreate(['code' => $data['code']], $data);
         }
 
+        // Historial del último mes para los costos de operación
+        $this->call(DispatchHistorySeeder::class);
+
         // Las unidades vuelven a su posición inicial: se descartan las rutas que el simulador tenía guardadas
         FleetSimulator::reset();
     }

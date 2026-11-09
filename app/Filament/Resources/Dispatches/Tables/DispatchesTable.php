@@ -5,6 +5,8 @@ namespace App\Filament\Resources\Dispatches\Tables;
 use App\Enums\DispatchPriority;
 use App\Enums\DispatchStatus;
 use App\Enums\DispatchType;
+use App\Filament\Resources\Dispatches\Actions\ShareTrackingAction;
+use App\Models\Dispatch;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -62,6 +64,21 @@ class DispatchesTable
                     ->placeholder('—')
                     ->toggleable(),
 
+                TextColumn::make('cost_total')
+                    ->label('Costo')
+                    ->money('CRC', locale: 'es_CR', decimalPlaces: 0)
+                    ->description(fn (Dispatch $record) => $record->distance_km ? number_format($record->distance_km, 1, ',', '.') . ' km' . ($record->distance_estimated ? ' (estimado)' : '') : null)
+                    ->tooltip(fn (Dispatch $record) => $record->cost_total === null ? null : implode("\n", [
+                        'Combustible: ₡' . number_format($record->cost_fuel, 0, ',', '.'),
+                        'Tripulación: ₡' . number_format($record->cost_crew, 0, ',', '.') . " ({$record->duration_minutes} min)",
+                        'Mantenimiento: ₡' . number_format($record->cost_maintenance, 0, ',', '.'),
+                        'Insumos: ₡' . number_format($record->cost_supplies, 0, ',', '.'),
+                        'Margen estimado: ₡' . number_format($record->margin(), 0, ',', '.'),
+                    ]))
+                    ->placeholder('—')
+                    ->sortable()
+                    ->toggleable(),
+
                 TextColumn::make('created_at')
                     ->label('Recibido')
                     ->since()
@@ -83,6 +100,7 @@ class DispatchesTable
                     ->options(DispatchStatus::class),
             ])
             ->recordActions([
+                ShareTrackingAction::make(),
                 EditAction::make(),
             ])
             ->toolbarActions([

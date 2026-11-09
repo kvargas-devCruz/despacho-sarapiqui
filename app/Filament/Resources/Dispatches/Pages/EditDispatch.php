@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Dispatches\Pages;
 
+use App\Filament\Resources\Dispatches\Actions\ShareTrackingAction;
 use App\Filament\Resources\Dispatches\DispatchResource;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -13,6 +14,7 @@ class EditDispatch extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            ShareTrackingAction::make(),
             DeleteAction::make(),
         ];
     }
