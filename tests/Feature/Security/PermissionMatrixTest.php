@@ -145,3 +145,12 @@ it('los usuarios nuevos empiezan con el permiso mínimo', function () {
 
     expect($user->fresh()->role)->toBe(UserRole::Viewer);
 });
+
+it('promueve un usuario desde la terminal', function () {
+    $user = User::create(['name' => 'Nuevo', 'email' => 'jefe@despacho.cr', 'password' => 'clave-segura-123']);
+
+    $this->artisan('user:role', ['email' => 'jefe@despacho.cr', 'role' => 'supervisor'])->assertSuccessful();
+    $this->artisan('user:role', ['email' => 'nadie@despacho.cr', 'role' => 'admin'])->assertFailed();
+
+    expect($user->fresh()->role)->toBe(UserRole::Supervisor);
+});
