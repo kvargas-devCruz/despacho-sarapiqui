@@ -138,6 +138,9 @@ class DemoSeeder extends Seeder
         // Historial del último mes para los costos de operación
         $this->call(DispatchHistorySeeder::class);
 
+        // Agenda de traslados programados y citas médicas
+        $this->call(ScheduleSeeder::class);
+
         // Las unidades vuelven a su posición inicial: se descartan las rutas que el simulador tenía guardadas
         FleetSimulator::reset();
     }

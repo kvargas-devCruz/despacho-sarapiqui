@@ -48,4 +48,14 @@ return [
         'transfer' => ['base' => 45000, 'per_km' => 750],
     ],
 
+    // Agenda de traslados programados y citas médicas
+    'schedule' => [
+        'transfer_speed_kmh' => 50,       // velocidad promedio en traslados no urgentes
+        'default_travel_minutes' => 40,   // si no hay ubicación del paciente
+        'boarding_minutes' => 10,         // subir al paciente a la unidad
+        'arrival_buffer_minutes' => 15,   // llegar antes de la hora de la cita
+        'handoff_minutes' => 20,          // entregar al paciente en el centro de salud
+        'appointment_minutes' => 90,      // espera de la cita cuando hay regreso
+    ],
+
 ];
