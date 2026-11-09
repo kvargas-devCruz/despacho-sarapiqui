@@ -40,8 +40,11 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 'Operaciones',
                 'Catálogos',
+                'Administración',
             ])
             ->sidebarCollapsibleOnDesktop()
+            // Si un modelo no tiene policy, se niega el acceso en vez de permitirlo
+            ->strictAuthorization()
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([

@@ -121,10 +121,13 @@ class Dispatch extends Model
         }
     }
 
-    /** Crea (o reutiliza) el enlace de seguimiento para compartir */
+    /**
+     * Crea (o reutiliza) el enlace de seguimiento para compartir. Si el enlace
+     * anterior ya venció, se crea uno nuevo con su propio plazo.
+     */
     public function shareTracking(): string
     {
-        if (blank($this->tracking_token)) {
+        if (blank($this->tracking_token) || $this->trackingExpired()) {
             $this->forceFill([
                 'tracking_token' => Str::random(40),
                 'tracking_shared_at' => now(),
@@ -139,10 +142,23 @@ class Dispatch extends Model
         return $this->tracking_token ? route('tracking.show', $this->tracking_token) : null;
     }
 
+    /** Anula el enlace: quien lo tenga recibe "no encontrado" */
+    public function revokeTracking(): void
+    {
+        $this->forceFill(['tracking_token' => null, 'tracking_shared_at' => null])->saveQuietly();
+    }
+
+    /** Pasó la vida máxima del enlace desde que se compartió */
+    public function trackingExpired(): bool
+    {
+        return $this->tracking_shared_at !== null
+            && $this->tracking_shared_at->lte(now()->subHours(config('operations.tracking.max_hours')));
+    }
+
     /** El enlace deja de mostrar la unidad un rato después de terminar el servicio */
     public function trackingIsOpen(): bool
     {
-        if ($this->status === DispatchStatus::Cancelled) {
+        if ($this->status === DispatchStatus::Cancelled || $this->trackingExpired()) {
             return false;
         }
 

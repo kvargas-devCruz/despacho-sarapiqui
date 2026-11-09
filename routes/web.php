@@ -11,6 +11,6 @@ Route::controller(TrackingController::class)
     ->prefix('seguimiento')
     ->name('tracking.')
     ->group(function () {
-        Route::get('/{token}', 'show')->name('show');
+        Route::get('/{token}', 'show')->middleware('throttle:30,1')->name('show');
         Route::get('/{token}/estado', 'state')->middleware('throttle:60,1')->name('state');
     });

@@ -64,12 +64,13 @@ class TrackingController extends Controller
                 'color' => LiveMap::STATUS_COLORS[$unit->status->value] ?? '#0d9488',
                 'updated' => $unit->last_location_at?->diffForHumans(),
             ] : null,
-            'pickup' => $dispatch->pickup_latitude ? [
+            // El punto de atención suele ser la casa del paciente: solo mientras
+            // el enlace está abierto, y sin la dirección escrita
+            'pickup' => $open && $dispatch->pickup_latitude ? [
                 'lat' => $dispatch->pickup_latitude,
                 'lng' => $dispatch->pickup_longitude,
-                'label' => $dispatch->pickup_address,
             ] : null,
-            'hospital' => $dispatch->hospital ? [
+            'hospital' => $open && $dispatch->hospital ? [
                 'lat' => $dispatch->hospital->latitude,
                 'lng' => $dispatch->hospital->longitude,
                 'label' => $dispatch->hospital->name,
@@ -107,6 +108,10 @@ class TrackingController extends Controller
 
         if ($dispatch->status === DispatchStatus::Completed) {
             return 'Servicio finalizado';
+        }
+
+        if ($dispatch->trackingExpired()) {
+            return 'Este enlace de seguimiento venció';
         }
 
         if ($dispatch->status === DispatchStatus::Pending || ! $dispatch->ambulance) {

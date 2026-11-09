@@ -7,6 +7,7 @@ use App\Enums\AmbulanceType;
 use App\Enums\DispatchPriority;
 use App\Enums\DispatchStatus;
 use App\Enums\DispatchType;
+use App\Enums\UserRole;
 use App\Models\Ambulance;
 use App\Models\Dispatch;
 use App\Models\Hospital;
@@ -19,10 +20,15 @@ class DemoSeeder extends Seeder
     public function run(): void
     {
         // ── Usuario de demostración ──
-        User::updateOrCreate(
-            ['email' => 'demo@despacho.cr'],
-            ['name' => 'Operador de Despacho', 'password' => 'demo1234'],
-        );
+        // Un usuario por rol para mostrar qué ve cada uno (contraseñas solo de demostración)
+        foreach ([
+            ['demo@despacho.cr', 'Operador de Despacho', UserRole::Admin],
+            ['supervisor@despacho.cr', 'Supervisión de turno', UserRole::Supervisor],
+            ['despachador@despacho.cr', 'Despachador', UserRole::Dispatcher],
+            ['consulta@despacho.cr', 'Consulta (gerencia)', UserRole::Viewer],
+        ] as [$email, $name, $role]) {
+            User::updateOrCreate(['email' => $email], ['name' => $name, 'role' => $role, 'password' => 'demo1234']);
+        }
 
         // ── Centros de salud de referencia (coordenadas aproximadas) ──
         $hospitals = collect([

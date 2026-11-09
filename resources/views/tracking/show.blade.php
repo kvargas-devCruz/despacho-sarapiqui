@@ -79,6 +79,7 @@
         <div class="note">
             <span class="live" id="live" @if (! $state['open']) style="display:none" @endif><i></i> Se actualiza solo cada 5 segundos.</span>
             <span id="closed" @if ($state['open']) style="display:none" @endif>Este enlace ya no muestra la ubicación de la unidad.</span>
+            <span id="offline" style="display:none; color:#b45309">Sin conexión: mostrando la última ubicación conocida. Reintentando…</span>
             <br>¿Dudas? Llame a la central de despacho.
         </div>
     </section>
@@ -139,12 +140,34 @@
             draw();
         }
 
+        // Si falla la conexión se avisa y se reintenta cada vez más espaciado
+        // (5, 10, 20 y hasta 30 s); si el enlace fue anulado, se deja de consultar.
+        let failures = 0;
+
         async function poll() {
             try {
                 const response = await fetch(url, { headers: { Accept: 'application/json' } });
-                if (response.ok) { state = await response.json(); render(); }
-            } catch (e) { /* sin conexión: se intenta de nuevo */ }
-            if (state.open) setTimeout(poll, 5000);
+
+                if (response.status === 404) {
+                    state = { ...state, open: false, unit: null, eta: null, headline: 'Este enlace de seguimiento ya no está disponible' };
+                    failures = 0;
+                    render();
+                    document.getElementById('offline').style.display = 'none';
+                    return;
+                }
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                state = await response.json();
+                failures = 0;
+                document.getElementById('offline').style.display = 'none';
+                render();
+            } catch (e) {
+                failures++;
+                document.getElementById('offline').style.display = '';
+            }
+
+            if (state.open) setTimeout(poll, Math.min(5000 * 2 ** failures, 30000));
         }
 
         render();

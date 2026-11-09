@@ -207,6 +207,7 @@ class ScheduledTransferResource extends Resource
             ->recordActions([
                 Action::make('dispatch')
                     ->label('Enviar unidad')
+                    ->authorize('update')
                     ->icon(Heroicon::OutlinedTruck)
                     ->color('success')
                     ->requiresConfirmation()
@@ -243,6 +244,7 @@ class ScheduledTransferResource extends Resource
 
                 Action::make('confirm')
                     ->label('Confirmar')
+                    ->authorize('update')
                     ->icon(Heroicon::OutlinedCheck)
                     ->color('info')
                     ->tooltip('El paciente confirmó la cita')
@@ -262,6 +264,7 @@ class ScheduledTransferResource extends Resource
 
                 Action::make('cancel')
                     ->label('Cancelar')
+                    ->authorize('update')
                     ->icon(Heroicon::OutlinedXMark)
                     ->color('danger')
                     ->requiresConfirmation()

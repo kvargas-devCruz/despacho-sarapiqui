@@ -4,7 +4,9 @@ namespace App\Filament\Resources\Dispatches\Actions;
 
 use App\Enums\DispatchStatus;
 use App\Models\Dispatch;
+use App\Support\Permissions;
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\HtmlString;
 
@@ -20,7 +22,7 @@ class ShareTrackingAction
             ->label('Compartir seguimiento')
             ->icon(Heroicon::OutlinedShare)
             ->color('primary')
-            ->visible(fn (Dispatch $record) => ! in_array($record->status, [DispatchStatus::Cancelled], true))
+            ->visible(fn (Dispatch $record) => Permissions::canShareTracking() && ! in_array($record->status, [DispatchStatus::Cancelled], true))
             ->modalHeading(fn (Dispatch $record) => "Seguimiento de {$record->code}")
             ->modalDescription('Quien tenga el enlace ve la unidad en el mapa, el estado y el tiempo estimado de llegada. No se muestran datos del paciente.')
             ->modalContent(function (Dispatch $record) {
@@ -37,7 +39,19 @@ class ShareTrackingAction
                     . '</div></div>'
                 );
             })
-            ->modalSubmitAction(false)
+            // Si el enlace llegó a quien no debía, se anula y se comparte uno nuevo
+            ->modalSubmitAction(fn (Action $action) => Permissions::allows('tracking', 'delete')
+                ? $action->label('Anular enlace')->color('danger')
+                : false)
+            ->action(function (Dispatch $record) {
+                $record->revokeTracking();
+
+                Notification::make()
+                    ->title('Enlace anulado')
+                    ->body('Quien lo tenga ya no puede ver el servicio. Puede compartir uno nuevo.')
+                    ->success()
+                    ->send();
+            })
             ->modalCancelActionLabel('Cerrar');
     }
 }

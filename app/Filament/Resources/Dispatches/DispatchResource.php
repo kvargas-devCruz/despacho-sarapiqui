@@ -6,6 +6,7 @@ use App\Enums\DispatchStatus;
 use App\Filament\Resources\Dispatches\Pages\CreateDispatch;
 use App\Filament\Resources\Dispatches\Pages\EditDispatch;
 use App\Filament\Resources\Dispatches\Pages\ListDispatches;
+use App\Filament\Resources\Dispatches\Pages\ViewDispatch;
 use App\Filament\Resources\Dispatches\Schemas\DispatchForm;
 use App\Filament\Resources\Dispatches\Tables\DispatchesTable;
 use App\Models\Dispatch;
@@ -70,6 +71,7 @@ class DispatchResource extends Resource
         return [
             'index' => ListDispatches::route('/'),
             'create' => CreateDispatch::route('/create'),
+            'view' => ViewDispatch::route('/{record}'),
             'edit' => EditDispatch::route('/{record}/edit'),
         ];
     }

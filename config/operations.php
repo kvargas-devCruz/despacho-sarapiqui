@@ -17,6 +17,10 @@ return [
         // Horas que el enlace sigue abierto después de terminar el servicio
         'hours_after_completion' => 2,
 
+        // Vida máxima del enlace desde que se compartió, aunque el servicio
+        // siga abierto (por ejemplo, si nadie lo cerró en el sistema)
+        'max_hours' => (int) env('OPS_TRACKING_MAX_HOURS', 12),
+
         // Velocidad promedio para estimar la hora de llegada (km/h)
         'average_speed_kmh' => 45,
 
@@ -56,6 +60,18 @@ return [
         'arrival_buffer_minutes' => 15,   // llegar antes de la hora de la cita
         'handoff_minutes' => 20,          // entregar al paciente en el centro de salud
         'appointment_minutes' => 90,      // espera de la cita cuando hay regreso
+    ],
+
+    // Servicio de rutas por carretera (OSRM). El servidor público de OSRM es
+    // solo para pruebas: para producción conviene uno propio o contratado.
+    'routing' => [
+        'osrm_url' => env('OPS_OSRM_URL', 'https://router.project-osrm.org'),
+        'connect_timeout' => 2,   // segundos para conectar
+        'timeout' => 4,           // segundos para responder
+        'retries' => 1,           // reintentos si falla la conexión o el servidor
+        'retry_delay_ms' => 300,
+        // Si falla, durante este tiempo no se consulta y se usa línea recta
+        'cooldown_seconds' => (int) env('OPS_ROUTING_COOLDOWN', 120),
     ],
 
 ];

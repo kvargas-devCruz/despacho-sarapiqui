@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Ambulances;
 use App\Filament\Resources\Ambulances\Pages\CreateAmbulance;
 use App\Filament\Resources\Ambulances\Pages\EditAmbulance;
 use App\Filament\Resources\Ambulances\Pages\ListAmbulances;
+use App\Filament\Resources\Ambulances\Pages\ViewAmbulance;
 use App\Filament\Resources\Ambulances\Schemas\AmbulanceForm;
 use App\Filament\Resources\Ambulances\Tables\AmbulancesTable;
 use App\Models\Ambulance;
@@ -51,6 +52,7 @@ class AmbulanceResource extends Resource
         return [
             'index' => ListAmbulances::route('/'),
             'create' => CreateAmbulance::route('/create'),
+            'view' => ViewAmbulance::route('/{record}'),
             'edit' => EditAmbulance::route('/{record}/edit'),
         ];
     }

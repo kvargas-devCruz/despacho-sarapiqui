@@ -10,9 +10,9 @@ use App\Models\Ambulance;
 use App\Models\AmbulanceLocation;
 use App\Models\Dispatch;
 use App\Models\Hospital;
+use App\Services\Routing\RouteProvider;
 use Closure;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -249,27 +249,16 @@ class FleetSimulator
         return $arrived;
     }
 
-    /** Pide la ruta por carretera a OSRM; si falla, usa línea recta */
+    /** Ruta por carretera; si el servicio de rutas falla, línea recta (ver RouteProvider) */
     private function fetchRoute(array $from, array $to): array
     {
-        try {
-            $url = "https://router.project-osrm.org/route/v1/driving/{$from[1]},{$from[0]};{$to[1]},{$to[0]}";
-            $coords = Http::timeout(6)
-                ->get($url, ['overview' => 'full', 'geometries' => 'geojson'])
-                ->json('routes.0.geometry.coordinates');
+        $route = app(RouteProvider::class)->route($from, $to);
 
-            if ($coords) {
-                $points = array_map(fn ($c) => [$c[1], $c[0]], $coords);
-
-                return [$from, ...$points, $to];
-            }
-        } catch (\Throwable) {
-            // sin conexión o servicio no disponible
+        if ($route->estimated) {
+            $this->log('   ⚠ Ruta por carretera no disponible, usando línea recta.');
         }
 
-        $this->log('   ⚠ Ruta por carretera no disponible, usando línea recta.');
-
-        return [$from, $to];
+        return $route->points;
     }
 
     /** Crea emergencias y asigna la unidad disponible más cercana. Devuelve la hora de la próxima emergencia. */

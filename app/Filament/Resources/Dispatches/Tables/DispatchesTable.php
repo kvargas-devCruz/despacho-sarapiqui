@@ -10,6 +10,7 @@ use App\Models\Dispatch;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -101,6 +102,7 @@ class DispatchesTable
             ])
             ->recordActions([
                 ShareTrackingAction::make(),
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->toolbarActions([

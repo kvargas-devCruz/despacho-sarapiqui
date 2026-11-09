@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'role', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
@@ -29,12 +29,18 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'role' => UserRole::class,
         ];
     }
 
-    /** Todos los usuarios registrados pueden entrar al panel de despacho */
+    public function hasRole(UserRole ...$roles): bool
+    {
+        return in_array($this->role, $roles, true);
+    }
+
+    /** Todos los usuarios con rol pueden entrar; lo que ven depende de config/permissions.php */
     public function canAccessPanel(Panel $panel): bool
     {
-        return true;
+        return $this->role !== null;
     }
 }

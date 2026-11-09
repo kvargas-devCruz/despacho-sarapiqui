@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Enums\DispatchStatus;
 use App\Models\Dispatch;
+use App\Support\Permissions;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -13,6 +14,12 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 class OperatingCostsWidget extends StatsOverviewWidget
 {
     protected static ?int $sort = 1;
+
+    /** Costos y márgenes: solo administración y supervisión */
+    public static function canView(): bool
+    {
+        return Permissions::canViewCosts();
+    }
 
     protected ?string $heading = 'Costos de operación';
 

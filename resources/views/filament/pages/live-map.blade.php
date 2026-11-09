@@ -54,6 +54,9 @@
         </style>
     @endassets
 
+    <div id="lm-offline" style="display:none; margin-bottom:8px; padding:8px 12px; border-radius:8px; background:#fef3c7; color:#92400e; font-size:14px">
+        Sin conexión con el servidor: el mapa muestra la última posición conocida. Reintentando cada 3 segundos…
+    </div>
     <div class="lm-wrap" wire:ignore>
         <div class="lm-stats" id="lm-stats"></div>
 
@@ -205,9 +208,16 @@
 
     render(@js($this->getMapData()));
 
+    // Si se cae la conexión, el mapa conserva lo último y muestra el aviso
     const timer = setInterval(async () => {
         if (!document.getElementById('lm-map')) return clearInterval(timer);
-        render(await $wire.getMapData());
+        const offline = document.getElementById('lm-offline');
+        try {
+            render(await $wire.getMapData());
+            offline.style.display = 'none';
+        } catch (e) {
+            offline.style.display = '';
+        }
     }, 3000);
 </script>
 @endscript

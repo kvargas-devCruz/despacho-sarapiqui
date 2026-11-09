@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Hospitals;
 use App\Filament\Resources\Hospitals\Pages\CreateHospital;
 use App\Filament\Resources\Hospitals\Pages\EditHospital;
 use App\Filament\Resources\Hospitals\Pages\ListHospitals;
+use App\Filament\Resources\Hospitals\Pages\ViewHospital;
 use App\Filament\Resources\Hospitals\Schemas\HospitalForm;
 use App\Filament\Resources\Hospitals\Tables\HospitalsTable;
 use App\Models\Hospital;
@@ -49,6 +50,7 @@ class HospitalResource extends Resource
         return [
             'index' => ListHospitals::route('/'),
             'create' => CreateHospital::route('/create'),
+            'view' => ViewHospital::route('/{record}'),
             'edit' => EditHospital::route('/{record}/edit'),
         ];
     }
