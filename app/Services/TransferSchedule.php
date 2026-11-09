@@ -59,6 +59,31 @@ class TransferSchedule
     }
 
     /**
+     * Otro traslado activo de la misma unidad que se cruza en horario.
+     *
+     * Esto no es un aviso: la agenda no permite guardar a la misma unidad en
+     * dos traslados a la vez (ver ScheduledTransfer::booted).
+     */
+    public function unitClash(ScheduledTransfer $transfer): ?ScheduledTransfer
+    {
+        if (! $transfer->ambulance_id || ($transfer->status && ! $transfer->status->isActive())) {
+            return null;
+        }
+
+        $start = $transfer->pickup_at ?? $this->suggestedPickup($transfer);
+        $end = $transfer->busy_until ?? $this->busyUntil($transfer);
+
+        return ScheduledTransfer::query()
+            ->where('ambulance_id', $transfer->ambulance_id)
+            ->whereIn('status', [ScheduledTransferStatus::Scheduled, ScheduledTransferStatus::Confirmed])
+            ->when($transfer->exists, fn ($q) => $q->whereKeyNot($transfer->getKey()))
+            ->where('pickup_at', '<', $end)
+            ->where('busy_until', '>', $start)
+            ->orderBy('pickup_at')
+            ->first();
+    }
+
+    /**
      * Choques de horario y avisos de la cita.
      *
      * @return array<int, string>
@@ -156,11 +181,16 @@ class TransferSchedule
         $hospital = $transfer->hospital;
 
         return DB::transaction(function () use ($transfer, $hospital) {
+            // Si la unidad agendada está atendiendo otro servicio (por ejemplo, una
+            // emergencia), el traslado sale pendiente para asignarle otra unidad.
+            $unit = $transfer->ambulance_id ? Ambulance::query()->lockForUpdate()->find($transfer->ambulance_id) : null;
+            $unitId = $unit && app(UnitAvailability::class)->isAvailable($unit) ? $unit->id : null;
+
             $dispatch = Dispatch::create([
                 'type' => DispatchType::Transfer,
                 'priority' => DispatchPriority::Low,
-                'status' => $transfer->ambulance_id ? DispatchStatus::Assigned : DispatchStatus::Pending,
-                'ambulance_id' => $transfer->ambulance_id,
+                'status' => $unitId ? DispatchStatus::Assigned : DispatchStatus::Pending,
+                'ambulance_id' => $unitId,
                 'hospital_id' => $hospital->id,
                 'patient_name' => $transfer->patient_name,
                 'description' => trim(($transfer->reason ?? 'Traslado programado') . ". Cita a las {$transfer->appointment_at->format('g:i a')}"
@@ -168,7 +198,7 @@ class TransferSchedule
                 'pickup_address' => $transfer->pickup_address,
                 'pickup_latitude' => $transfer->pickup_latitude,
                 'pickup_longitude' => $transfer->pickup_longitude,
-                'assigned_at' => $transfer->ambulance_id ? now() : null,
+                'assigned_at' => $unitId ? now() : null,
             ]);
 
             $transfer->update(['status' => ScheduledTransferStatus::Dispatched, 'dispatch_id' => $dispatch->id]);

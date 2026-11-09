@@ -2,10 +2,12 @@
 
 use App\Enums\AmbulanceStatus;
 use App\Enums\AmbulanceType;
+use App\Enums\DispatchPriority;
 use App\Enums\DispatchStatus;
 use App\Enums\DispatchType;
 use App\Enums\ScheduledTransferStatus;
 use App\Models\Ambulance;
+use App\Models\Dispatch;
 use App\Models\Hospital;
 use App\Models\ScheduledTransfer;
 use App\Models\User;
@@ -57,17 +59,42 @@ it('calcula la hora de recogida y el tiempo ocupado', function () {
     expect($oneWay->fresh()->pickup_at->format('H:i'))->toBe('13:30');
 });
 
-it('avisa los choques de horario', function () {
-    $unit = unidadDeTraslado();
-    cita(['ambulance_id' => $unit->id]);
-    $clash = cita(['patient_name' => 'Carlos Brenes', 'appointment_at' => '2026-11-10 10:10', 'ambulance_id' => $unit->id]);
+it('avisa cuando a una hora hay más traslados que unidades o el paciente se repite', function () {
+    unidadDeTraslado();
+    cita();
+    $sameTime = cita(['patient_name' => 'Carlos Brenes', 'appointment_at' => '2026-11-10 10:10']);
     $samePatient = cita(['appointment_at' => '2026-11-10 16:00']);
 
-    $warnings = app(TransferSchedule::class)->conflicts($clash);
-
-    expect(collect($warnings)->join(' '))->toContain('La unidad ya tiene el traslado de Rosa Quirós')
-        ->toContain('solo hay 1 unidad disponible')
+    expect(collect(app(TransferSchedule::class)->conflicts($sameTime))->join(' '))->toContain('solo hay 1 unidad disponible')
         ->and(app(TransferSchedule::class)->conflicts($samePatient))->toContain('El paciente ya tiene otro traslado ese mismo día.');
+});
+
+it('no deja agendar la misma unidad en dos traslados que se cruzan', function () {
+    $unit = unidadDeTraslado();
+    cita(['ambulance_id' => $unit->id]);
+
+    expect(fn () => cita(['patient_name' => 'Carlos Brenes', 'appointment_at' => '2026-11-10 10:10', 'ambulance_id' => $unit->id]))
+        ->toThrow(ValidationException::class, 'La unidad ya tiene el traslado de Rosa Quirós');
+
+    // A otra hora sí se puede, y una cita cancelada libera la unidad
+    $later = cita(['patient_name' => 'Carlos Brenes', 'appointment_at' => '2026-11-10 15:00', 'ambulance_id' => $unit->id]);
+    $later->update(['status' => ScheduledTransferStatus::Cancelled]);
+    expect(cita(['patient_name' => 'Elena Vargas', 'appointment_at' => '2026-11-10 15:00', 'ambulance_id' => $unit->id])->exists)->toBeTrue();
+
+    // Mover una cita encima de otra tampoco se permite
+    expect(fn () => $later->fresh()->update(['status' => ScheduledTransferStatus::Scheduled]))
+        ->toThrow(ValidationException::class);
+});
+
+it('si la unidad agendada está en una emergencia, el traslado sale pendiente', function () {
+    $unit = unidadDeTraslado();
+    $transfer = cita(['ambulance_id' => $unit->id]);
+    Dispatch::create(['type' => DispatchType::Emergency, 'priority' => DispatchPriority::High, 'ambulance_id' => $unit->id, 'pickup_address' => 'Ruta 4']);
+
+    $dispatch = app(TransferSchedule::class)->dispatch($transfer);
+
+    expect($dispatch->ambulance_id)->toBeNull()
+        ->and($dispatch->status)->toBe(DispatchStatus::Pending);
 });
 
 it('agenda una serie semanal', function () {

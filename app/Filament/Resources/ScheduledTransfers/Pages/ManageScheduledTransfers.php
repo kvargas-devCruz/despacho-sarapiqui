@@ -20,7 +20,7 @@ class ManageScheduledTransfers extends ManageRecords
         return [
             CreateAction::make()
                 ->label('Agendar traslado')
-                ->using(function (array $data) {
+                ->using(fn (array $data, CreateAction $action) => ScheduledTransferResource::saveOrWarn($action, function () use ($data) {
                     $repeat = (bool) Arr::pull($data, 'repeat', false);
                     $days = array_map('intval', Arr::pull($data, 'repeat_days', []) ?? []);
                     $until = Arr::pull($data, 'repeat_until');
@@ -47,7 +47,7 @@ class ManageScheduledTransfers extends ManageRecords
                     }
 
                     return $transfer;
-                }),
+                })),
         ];
     }
 }

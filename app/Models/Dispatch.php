@@ -6,9 +6,11 @@ use App\Enums\DispatchPriority;
 use App\Enums\DispatchStatus;
 use App\Enums\DispatchType;
 use App\Services\DispatchCostCalculator;
+use App\Services\UnitAvailability;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class Dispatch extends Model
 {
@@ -29,6 +31,11 @@ class Dispatch extends Model
         'on_scene_at',
         'completed_at',
         'cancelled_at',
+    ];
+
+    /** Igual que en la base de datos, para que el modelo conozca su estado desde que se crea */
+    protected $attributes = [
+        'status' => 'pending',
     ];
 
     protected $hidden = [
@@ -67,12 +74,51 @@ class Dispatch extends Model
             $dispatch->code ??= 'SRV-' . now()->format('ymd') . '-' . Str::upper(Str::random(4));
         });
 
+        // Reglas de asignación: el estado sigue a la unidad y una unidad ocupada no se repite
+        static::saving(function (Dispatch $dispatch) {
+            $dispatch->syncStatusWithUnit();
+
+            if ($dispatch->ambulance_id && $dispatch->isActive() && $dispatch->isDirty(['ambulance_id', 'status'])) {
+                $unit = Ambulance::find($dispatch->ambulance_id);
+
+                if ($unit && $reason = app(UnitAvailability::class)->unavailableReason($unit, $dispatch)) {
+                    throw ValidationException::withMessages(['ambulance_id' => $reason]);
+                }
+            }
+        });
+
         // Al completarse, calcula solo su costo de operación
         static::saved(function (Dispatch $dispatch) {
             if ($dispatch->status === DispatchStatus::Completed && $dispatch->cost_total === null) {
                 app(DispatchCostCalculator::class)->apply($dispatch);
             }
         });
+    }
+
+    /** Pendiente con unidad, asignado o en curso: ocupa a la unidad */
+    public function isActive(): bool
+    {
+        return in_array($this->status, UnitAvailability::ACTIVE_STATUSES, true);
+    }
+
+    /**
+     * Al poner unidad a un servicio pendiente queda "asignado" con su hora;
+     * si se le quita la unidad a uno asignado, vuelve a "pendiente".
+     */
+    private function syncStatusWithUnit(): void
+    {
+        if ($this->ambulance_id && $this->status === DispatchStatus::Pending) {
+            $this->status = DispatchStatus::Assigned;
+        }
+
+        if (! $this->ambulance_id && $this->status === DispatchStatus::Assigned) {
+            $this->status = DispatchStatus::Pending;
+            $this->assigned_at = null;
+        }
+
+        if ($this->ambulance_id && $this->status === DispatchStatus::Assigned && $this->isDirty('ambulance_id') && ! $this->isDirty('assigned_at')) {
+            $this->assigned_at = now();
+        }
     }
 
     /** Crea (o reutiliza) el enlace de seguimiento para compartir */

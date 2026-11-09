@@ -7,6 +7,7 @@ use App\Enums\ScheduledTransferStatus;
 use App\Services\TransferSchedule;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Traslado programado o cita médica: el paciente debe llegar al centro
@@ -69,6 +70,13 @@ class ScheduledTransfer extends Model
             }
 
             $transfer->busy_until = $schedule->busyUntil($transfer);
+
+            // La misma unidad no puede estar en dos traslados a la vez
+            if ($transfer->isDirty(['ambulance_id', 'pickup_at', 'busy_until', 'status']) && $clash = $schedule->unitClash($transfer)) {
+                throw ValidationException::withMessages([
+                    'ambulance_id' => "La unidad ya tiene el traslado de {$clash->patient_name} entre {$clash->pickup_at->format('g:i a')} y {$clash->busy_until->format('g:i a')}. Elija otra unidad u otra hora.",
+                ]);
+            }
         });
     }
 

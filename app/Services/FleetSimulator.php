@@ -13,6 +13,7 @@ use App\Models\Hospital;
 use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Simula el comportamiento de la flota: movimiento por carretera,
@@ -30,9 +31,13 @@ class FleetSimulator
     ];
 
     private const ON_SCENE_SECONDS = 45;
+
     private const AT_HOSPITAL_SECONDS = 30;
+
     private const AUTO_ASSIGN_AFTER_SECONDS = 20;
+
     private const MAX_STEP_SECONDS = 10;
+
     private const STATE_KEY = 'fleet-simulator:state';
 
     /** Incidentes ficticios para el modo automático */
@@ -197,6 +202,7 @@ class FleetSimulator
         if ($this->distance($from, $to) < 25) {
             $unit->speed = 0;
             $s['route'] = [];
+
             return true;
         }
 
@@ -254,6 +260,7 @@ class FleetSimulator
 
             if ($coords) {
                 $points = array_map(fn ($c) => [$c[1], $c[0]], $coords);
+
                 return [$from, ...$points, $to];
             }
         } catch (\Throwable) {
@@ -261,6 +268,7 @@ class FleetSimulator
         }
 
         $this->log('   ⚠ Ruta por carretera no disponible, usando línea recta.');
+
         return [$from, $to];
     }
 
@@ -277,7 +285,9 @@ class FleetSimulator
         foreach ($pending as $dispatch) {
             $pickup = [$dispatch->pickup_latitude, $dispatch->pickup_longitude];
 
-            $unit = Ambulance::where('is_simulated', true)
+            // Libre de verdad: disponible en el mapa y sin otro servicio activo
+            $unit = app(UnitAvailability::class)->assignableUnits()
+                ->where('is_simulated', true)
                 ->where('status', AmbulanceStatus::Available)
                 ->get()
                 ->sortBy(fn (Ambulance $u) => $this->distance([$u->latitude, $u->longitude], $pickup))
@@ -287,11 +297,11 @@ class FleetSimulator
                 break; // no hay unidades libres; se intentará en el siguiente paso
             }
 
-            $dispatch->update([
-                'ambulance_id' => $unit->id,
-                'status' => DispatchStatus::Assigned,
-                'assigned_at' => now(),
-            ]);
+            try {
+                app(UnitAvailability::class)->assign($dispatch, $unit);
+            } catch (ValidationException) {
+                continue; // alguien la asignó en este mismo instante; se reintenta en el siguiente paso
+            }
 
             $this->log("   📟 {$dispatch->code} asignado a {$unit->code}");
         }

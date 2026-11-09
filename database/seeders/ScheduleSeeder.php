@@ -13,8 +13,8 @@ use Illuminate\Support\Carbon;
 
 /**
  * Agenda de demostración para la próxima semana (pacientes ficticios):
- * una serie de hemodiálisis, controles y terapias, con un par de choques
- * de horario para que el sistema los señale.
+ * una serie de hemodiálisis, controles y terapias, con horas en que hay más
+ * traslados que unidades para que el sistema lo señale.
  */
 class ScheduleSeeder extends Seeder
 {
@@ -58,7 +58,7 @@ class ScheduleSeeder extends Seeder
         ];
 
         foreach ($items as [$days, $time, $name, $reason, $address, $lat, $lng, $short, $roundTrip, $assign, $status]) {
-            ScheduledTransfer::create([
+            $transfer = new ScheduledTransfer([
                 'patient_name' => $name,
                 'reason' => $reason,
                 'pickup_address' => $address,
@@ -71,6 +71,14 @@ class ScheduleSeeder extends Seeder
                 'ambulance_id' => $assign ? $transferUnit?->id : null,
                 'status' => $status,
             ]);
+
+            // La agenda no deja a la misma unidad en dos traslados a la vez: si
+            // choca, la cita queda sin unidad y el sistema avisa que falta asignarla
+            if ($schedule->unitClash($transfer)) {
+                $transfer->ambulance_id = null;
+            }
+
+            $transfer->save();
         }
     }
 }

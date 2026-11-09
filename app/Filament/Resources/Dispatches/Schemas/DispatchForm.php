@@ -5,12 +5,17 @@ namespace App\Filament\Resources\Dispatches\Schemas;
 use App\Enums\DispatchPriority;
 use App\Enums\DispatchStatus;
 use App\Enums\DispatchType;
+use App\Models\Ambulance;
+use App\Models\Dispatch;
+use App\Services\UnitAvailability;
+use Closure;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 
 class DispatchForm
 {
@@ -102,12 +107,31 @@ class DispatchForm
                 Section::make('Asignación')
                     ->columnSpanFull()
                     ->schema([
+                        // Solo se ofrecen unidades libres (y la que ya tiene el servicio)
                         Select::make('ambulance_id')
                             ->label('Unidad asignada')
-                            ->relationship('ambulance', 'code')
+                            ->relationship(
+                                'ambulance',
+                                'code',
+                                fn (Builder $query, ?Dispatch $record) => $query->whereIn(
+                                    'ambulances.id',
+                                    app(UnitAvailability::class)->assignableUnits($record)->select('id')
+                                ),
+                            )
+                            ->getOptionLabelFromRecordUsing(fn (Ambulance $record) => "{$record->code} · {$record->type->getLabel()}")
                             ->searchable()
                             ->preload()
-                            ->placeholder('Sin asignar'),
+                            ->placeholder('Sin asignar')
+                            ->helperText('Solo aparecen las unidades libres. Al asignar una, el servicio pasa a "Asignado".')
+                            ->rules([
+                                fn (?Dispatch $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
+                                    $unit = $value ? Ambulance::find($value) : null;
+
+                                    if ($unit && $reason = app(UnitAvailability::class)->unavailableReason($unit, $record)) {
+                                        $fail($reason);
+                                    }
+                                },
+                            ]),
                     ]),
             ]);
     }

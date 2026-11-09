@@ -10,6 +10,7 @@ use App\Models\Ambulance;
 use App\Models\ScheduledTransfer;
 use App\Services\TransferSchedule;
 use BackedEnum;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\CheckboxList;
@@ -221,6 +222,18 @@ class ScheduledTransferResource extends Resource
                             return;
                         }
 
+                        // La unidad agendada estaba ocupada: el servicio queda pendiente
+                        if ($record->ambulance_id && ! $dispatch->ambulance_id) {
+                            Notification::make()
+                                ->title("Servicio {$dispatch->code} creado sin unidad")
+                                ->body("La unidad {$record->ambulance?->code} está atendiendo otro servicio. Asigne otra desde Servicios.")
+                                ->warning()
+                                ->persistent()
+                                ->send();
+
+                            return;
+                        }
+
                         Notification::make()
                             ->title("Servicio {$dispatch->code} creado")
                             ->body('Ya aparece en Servicios y en el mapa en vivo.')
@@ -244,7 +257,8 @@ class ScheduledTransferResource extends Resource
                     ->url(fn (ScheduledTransfer $record) => DispatchResource::getUrl('edit', ['record' => $record->dispatch_id])),
 
                 EditAction::make()
-                    ->visible(fn (ScheduledTransfer $record) => $record->status->isActive()),
+                    ->visible(fn (ScheduledTransfer $record) => $record->status->isActive())
+                    ->using(fn (ScheduledTransfer $record, array $data, EditAction $action) => static::saveOrWarn($action, fn () => tap($record)->update($data))),
 
                 Action::make('cancel')
                     ->label('Cancelar')
@@ -254,6 +268,28 @@ class ScheduledTransferResource extends Resource
                     ->visible(fn (ScheduledTransfer $record) => $record->status->isActive())
                     ->action(fn (ScheduledTransfer $record) => $record->update(['status' => ScheduledTransferStatus::Cancelled])),
             ]);
+    }
+
+    /**
+     * Guarda y, si la unidad ya está ocupada a esa hora, avisa sin cerrar el
+     * formulario para que se pueda elegir otra unidad u otra hora.
+     */
+    public static function saveOrWarn(Action $action, Closure $save): mixed
+    {
+        try {
+            return $save();
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title('No se puede agendar con esa unidad')
+                ->body(collect($exception->errors())->flatten()->first())
+                ->danger()
+                ->persistent()
+                ->send();
+
+            $action->halt();
+        }
+
+        return null;
     }
 
     public static function getPages(): array

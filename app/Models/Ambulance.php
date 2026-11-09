@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Enums\AmbulanceStatus;
 use App\Enums\AmbulanceType;
-use App\Enums\DispatchStatus;
+use App\Services\UnitAvailability;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -55,7 +55,7 @@ class Ambulance extends Model
     public function activeDispatch(): HasOne
     {
         return $this->hasOne(Dispatch::class)
-            ->whereIn('status', [DispatchStatus::Assigned, DispatchStatus::InProgress])
+            ->whereIn('status', UnitAvailability::ACTIVE_STATUSES)
             ->latest('id');
     }
 
