@@ -137,8 +137,23 @@ class DemoSeeder extends Seeder
             ],
         ];
 
+        // Mientras la demo está publicada, el simulador mueve estos servicios y
+        // les asigna unidades. Antes de volver a cargarlos se liberan, porque si
+        // no chocan con la regla de una unidad por servicio activo. Se hace con
+        // consultas directas: es un reinicio de datos de demostración.
+        Dispatch::where('code', 'like', 'SRV-DEMO-%')
+            ->update(['ambulance_id' => null, 'status' => DispatchStatus::Pending->value, 'assigned_at' => null]);
+
+        $demoUnits = collect($dispatches)->pluck('ambulance_id')->filter()->all();
+
+        Dispatch::whereIn('ambulance_id', $demoUnits)
+            ->whereIn('status', ['pending', 'assigned', 'in_progress'])
+            ->where('code', 'not like', 'SRV-DEMO-%')
+            ->update(['status' => DispatchStatus::Cancelled->value, 'cancelled_at' => now()]);
+
         foreach ($dispatches as $data) {
-            Dispatch::updateOrCreate(['code' => $data['code']], $data);
+            // Un servicio sin unidad en los datos queda sin unidad (el simulador pudo haberle puesto una)
+            Dispatch::updateOrCreate(['code' => $data['code']], $data + ['ambulance_id' => null]);
         }
 
         // Historial del último mes para los costos de operación
