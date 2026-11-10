@@ -9,6 +9,8 @@ use App\Services\DispatchCostCalculator;
 use App\Services\UnitAvailability;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -18,6 +20,8 @@ class Dispatch extends Model
         'code',
         'type',
         'priority',
+        'caller_phone',
+        'patient_id',
         'status',
         'ambulance_id',
         'hospital_id',
@@ -75,7 +79,17 @@ class Dispatch extends Model
         });
 
         // Reglas de asignación: el estado sigue a la unidad y una unidad ocupada no se repite
+        // Bitácora: cada cambio de estado queda registrado con hora y usuario
+        static::created(fn (Dispatch $dispatch) => $dispatch->logStatus());
+        static::updated(function (Dispatch $dispatch) {
+            if ($dispatch->wasChanged('status') || ($dispatch->wasChanged('ambulance_id') && $dispatch->ambulance_id)) {
+                $dispatch->logStatus();
+            }
+        });
+
         static::saving(function (Dispatch $dispatch) {
+            $dispatch->caller_phone = Patient::normalizePhone($dispatch->caller_phone);
+
             $dispatch->syncStatusWithUnit();
 
             if ($dispatch->ambulance_id && $dispatch->isActive() && $dispatch->isDirty(['ambulance_id', 'status'])) {
@@ -118,6 +132,17 @@ class Dispatch extends Model
 
         if ($this->ambulance_id && $this->status === DispatchStatus::Assigned && $this->isDirty('ambulance_id') && ! $this->isDirty('assigned_at')) {
             $this->assigned_at = now();
+        }
+
+        // Al cambiar el estado a mano también se guarda la hora: sin esto, las
+        // métricas de tiempos de respuesta solo contaban los servicios del simulador
+        if ($this->isDirty('status')) {
+            match ($this->status) {
+                DispatchStatus::InProgress => $this->on_scene_at ??= now(),
+                DispatchStatus::Completed => $this->completed_at ??= now(),
+                DispatchStatus::Cancelled => $this->cancelled_at ??= now(),
+                default => null,
+            };
         }
     }
 
@@ -175,6 +200,31 @@ class Dispatch extends Model
         return $this->cost_total === null || $this->reference_charge === null
             ? null
             : $this->reference_charge - $this->cost_total;
+    }
+
+    /** Escribe una línea en la bitácora con el estado actual */
+    public function logStatus(?string $note = null): void
+    {
+        $note ??= match (true) {
+            $this->status === DispatchStatus::Assigned && $this->ambulance_id !== null => 'Unidad ' . $this->ambulance()->value('code') . ' asignada',
+            default => null,
+        };
+
+        $this->events()->create([
+            'status' => $this->status,
+            'user_id' => Auth::id(),
+            'note' => $note,
+        ]);
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(DispatchEvent::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    public function patient(): BelongsTo
+    {
+        return $this->belongsTo(Patient::class);
     }
 
     public function ambulance(): BelongsTo

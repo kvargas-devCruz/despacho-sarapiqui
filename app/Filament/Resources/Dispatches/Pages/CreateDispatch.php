@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Dispatches\Pages;
 
 use App\Filament\Resources\Dispatches\DispatchResource;
 use App\Filament\Resources\Dispatches\Pages\Concerns\ReportsAssignmentErrors;
+use App\Models\Patient;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
@@ -16,6 +17,11 @@ class CreateDispatch extends CreateRecord
     /** @param  array<string, mixed>  $data */
     protected function handleRecordCreation(array $data): Model
     {
-        return $this->withAssignmentErrors(fn () => parent::handleRecordCreation($data));
+        $dispatch = $this->withAssignmentErrors(fn () => parent::handleRecordCreation($data));
+
+        // Recuerda al paciente para reconocerlo la próxima vez que llamen
+        Patient::rememberFrom($dispatch, $this->data['patient_national_id'] ?? null);
+
+        return $dispatch;
     }
 }

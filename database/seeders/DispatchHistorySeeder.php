@@ -8,6 +8,7 @@ use App\Enums\DispatchType;
 use App\Models\Ambulance;
 use App\Models\Dispatch;
 use App\Models\Hospital;
+use App\Models\Patient;
 use Illuminate\Database\Seeder;
 
 /**
@@ -38,6 +39,13 @@ class DispatchHistorySeeder extends Seeder
             return;
         }
 
+        // Pacientes frecuentes para mostrar cómo el sistema los reconoce al llamar
+        $frequent = [
+            Patient::updateOrCreate(['phone' => '88112233'], ['full_name' => 'Rosa Quirós Vargas', 'address' => 'La Virgen, 300 m sur de la escuela', 'latitude' => 10.3906, 'longitude' => -84.1253, 'care_notes' => 'Usa oxígeno domiciliar. Casa con gradas: llevar silla de traslado.']),
+            Patient::updateOrCreate(['phone' => '87004455'], ['full_name' => 'Manuel Arias Brenes', 'address' => 'Puerto Viejo, barrio Los Ángeles', 'latitude' => 10.4590, 'longitude' => -84.0160, 'care_notes' => 'Diabético, hemodiálisis lunes, miércoles y viernes.']),
+            Patient::updateOrCreate(['phone' => '86557788'], ['full_name' => 'Lucía Méndez Soto', 'address' => 'Chilamate, frente a la plaza', 'latitude' => 10.4470, 'longitude' => -84.0780, 'care_notes' => null]),
+        ];
+
         for ($i = 1; $i <= 36; $i++) {
             [$place, $lat, $lng, $type, $hospital] = self::PLACES[$i % count(self::PLACES)];
             $isEmergency = $type === 'emergency';
@@ -47,28 +55,38 @@ class DispatchHistorySeeder extends Seeder
                 ? today()->setTime(6 + $i * 2, ($i * 17) % 60)
                 : now()->subDays(($i * 3) % 28 + 1)->setTime(7 + ($i * 5) % 12, ($i * 13) % 60);
             $minutes = $isEmergency ? 45 + ($i * 7) % 40 : 80 + ($i * 11) % 90;
+            $priority = $isEmergency ? ($i % 3 === 0 ? DispatchPriority::High : DispatchPriority::Medium) : DispatchPriority::Low;
+
+            // Minutos desde la llamada hasta llegar, casi siempre dentro de la meta
+            $toArrive = match ($priority) {
+                DispatchPriority::High => 8 + ($i * 3) % 11,
+                DispatchPriority::Medium => 12 + ($i * 5) % 24,
+                DispatchPriority::Low => 20 + ($i * 7) % 55,
+            };
+            $createdAt = $completedAt->copy()->subMinutes($minutes);
+            $patient = $i % 5 === 0 ? $frequent[($i / 5) % 3] : null;
 
             $dispatch = Dispatch::firstOrNew(['code' => sprintf('SRV-HIST-%03d', $i)]);
 
             $dispatch->fill([
                 'type' => $isEmergency ? DispatchType::Emergency : DispatchType::Transfer,
-                'priority' => $isEmergency ? ($i % 3 === 0 ? DispatchPriority::High : DispatchPriority::Medium) : DispatchPriority::Low,
+                'priority' => $priority,
                 'status' => DispatchStatus::Completed,
                 'ambulance_id' => $ambulances[$i % $ambulances->count()]->id,
                 'hospital_id' => $hospitals[$hospital]?->id,
-                'patient_name' => 'Paciente de demostración',
+                'patient_name' => $patient?->full_name ?? 'Paciente de demostración',
+                'patient_id' => $patient?->id,
+                'caller_phone' => $patient?->phone,
                 'description' => $isEmergency ? 'Atención de emergencia (historial de demostración).' : 'Traslado programado (historial de demostración).',
                 'pickup_address' => $place,
                 'pickup_latitude' => $lat,
                 'pickup_longitude' => $lng,
-                'assigned_at' => $completedAt->copy()->subMinutes($minutes),
-                'on_scene_at' => $completedAt->copy()->subMinutes((int) ($minutes * 0.6)),
+                'assigned_at' => $createdAt->copy()->addMinutes(1 + $i % 4),
+                'on_scene_at' => $createdAt->copy()->addMinutes($toArrive),
                 'completed_at' => $completedAt,
             ]);
 
-            if (! $dispatch->exists) {
-                $dispatch->created_at = $completedAt->copy()->subMinutes($minutes + 3);
-            }
+            $dispatch->created_at = $createdAt;
 
             // El costo se recalcula con las fechas nuevas
             $dispatch->cost_total = null;

@@ -30,6 +30,15 @@ return [
     // Agenda de traslados programados y citas médicas
     'scheduled_transfers' => ['view' => $all, 'create' => $operations, 'update' => $operations, 'delete' => $management],
 
+    // Pacientes frecuentes: datos personales y de salud, solo el equipo operativo
+    'patients' => ['view' => $operations, 'create' => $operations, 'update' => $operations, 'delete' => ['admin']],
+
+    // Bitácora del servicio: se escribe sola y no se edita
+    'dispatch_events' => ['view' => $all],
+
+    // Métricas de tiempos de respuesta
+    'metrics' => ['view' => $all],
+
     // Enlace público de seguimiento para el paciente, la familia o el hospital
     'tracking' => ['create' => $operations, 'delete' => $operations],
 

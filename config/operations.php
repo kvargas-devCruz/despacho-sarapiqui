@@ -62,6 +62,27 @@ return [
         'appointment_minutes' => 90,      // espera de la cita cuando hay regreso
     ],
 
+    // Protección de datos de pacientes
+    'security' => [
+        // Llave de la huella de cédulas; si queda vacía se usa APP_KEY
+        'blind_index_key' => env('OPS_BLIND_INDEX_KEY'),
+    ],
+
+    // Posibles solicitudes duplicadas: mismo teléfono, mismo paciente o muy
+    // cerca de un servicio activo creado hace poco
+    'duplicates' => [
+        'minutes' => 60,
+        'meters' => 300,
+    ],
+
+    // Metas de tiempo de respuesta en minutos (desde que entra la solicitud
+    // hasta que la unidad llega), por prioridad
+    'response_targets' => [
+        'high' => (int) env('OPS_TARGET_HIGH', 15),
+        'medium' => (int) env('OPS_TARGET_MEDIUM', 30),
+        'low' => (int) env('OPS_TARGET_LOW', 90),
+    ],
+
     // Servicio de rutas por carretera (OSRM). El servidor público de OSRM es
     // solo para pruebas: para producción conviene uno propio o contratado.
     'routing' => [

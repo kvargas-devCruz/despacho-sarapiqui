@@ -88,6 +88,7 @@ it('responde a cada URL directa según el rol', function (string $url, array $al
     'editar unidad' => ['/admin/ambulances/{unit}/edit', [UserRole::Admin, UserRole::Supervisor]],
     'editar hospital' => ['/admin/hospitals/{hospital}/edit', [UserRole::Admin, UserRole::Supervisor]],
     'usuarios' => ['/admin/users', [UserRole::Admin]],
+    'pacientes' => ['/admin/patients', [UserRole::Admin, UserRole::Supervisor, UserRole::Dispatcher]],
 ]);
 
 it('solo consulta no ve botones para crear, editar, compartir ni borrar', function () {
