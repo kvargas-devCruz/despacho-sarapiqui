@@ -28,3 +28,10 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Herramientas de IA y del editor: se quedan solo en la compu, no se suben
+/.claude
+/.mcp.json
+/CLAUDE.md
+/AGENTS.md
+/boost.json
