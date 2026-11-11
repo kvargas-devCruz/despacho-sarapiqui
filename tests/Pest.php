@@ -44,7 +44,26 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Respuestas mínimas del guion de recepción para crear una emergencia desde
+ * el formulario: motivo, preguntas de sí / no y punto confirmado en el mapa.
+ *
+ * @return array<string, mixed>
+ */
+function guionCompleto(array $overrides = []): array
 {
-    // ..
+    return array_merge([
+        'caller_phone' => '8700-0000',
+        'chief_complaint' => 'illness',
+        'triage' => [
+            'conscious' => 1,
+            'breathing' => 1,
+            'severe_bleeding' => 0,
+            'multiple_patients' => 0,
+            'scene_danger' => 0,
+        ],
+        'pickup_latitude' => 10.4470,
+        'pickup_longitude' => -84.0780,
+        'location_confirmed' => true,
+    ], $overrides);
 }

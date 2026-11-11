@@ -83,6 +83,35 @@ return [
         'low' => (int) env('OPS_TARGET_LOW', 90),
     ],
 
+    // Recepción guiada de emergencias: motivos del guion con su prioridad base
+    // y preguntas de sí / no que pueden subirla. El sistema sugiere la mayor.
+    'intake' => [
+        'complaints' => [
+            'chest_pain' => ['label' => 'Dolor en el pecho', 'priority' => 'high'],
+            'breathing' => ['label' => 'Dificultad para respirar', 'priority' => 'high'],
+            'unconscious' => ['label' => 'Inconsciente o desmayo', 'priority' => 'high'],
+            'stroke' => ['label' => 'Posible derrame (cara, brazo o habla)', 'priority' => 'high'],
+            'seizure' => ['label' => 'Convulsión', 'priority' => 'high'],
+            'trauma' => ['label' => 'Accidente de tránsito o caída', 'priority' => 'medium'],
+            'bleeding' => ['label' => 'Herida o sangrado', 'priority' => 'medium'],
+            'pregnancy' => ['label' => 'Embarazo o parto', 'priority' => 'medium'],
+            'illness' => ['label' => 'Fiebre o malestar general', 'priority' => 'low'],
+            'other' => ['label' => 'Otro motivo', 'priority' => 'medium'],
+        ],
+
+        // 'when' es la respuesta que hace subir la prioridad
+        'questions' => [
+            'conscious' => ['label' => '¿Está consciente y responde?', 'when' => false, 'priority' => 'high', 'reason' => 'no responde'],
+            'breathing' => ['label' => '¿Respira con normalidad?', 'when' => false, 'priority' => 'high', 'reason' => 'no respira con normalidad'],
+            'severe_bleeding' => ['label' => '¿Hay sangrado abundante que no se detiene?', 'when' => true, 'priority' => 'high', 'reason' => 'sangrado abundante'],
+            'multiple_patients' => ['label' => '¿Hay más de un paciente?', 'when' => true, 'priority' => 'high', 'reason' => 'varios pacientes'],
+            'scene_danger' => ['label' => '¿Hay peligro en la escena (fuego, armas, tránsito)?', 'when' => true, 'priority' => null, 'reason' => 'peligro en la escena: coordinar con el 9-1-1 antes de enviar la unidad'],
+        ],
+
+        // Menores de 1 año y mayores de esta edad no bajan de prioridad media
+        'vulnerable_age' => 75,
+    ],
+
     // Servicio de rutas por carretera (OSRM). El servidor público de OSRM es
     // solo para pruebas: para producción conviene uno propio o contratado.
     'routing' => [

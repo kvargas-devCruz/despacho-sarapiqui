@@ -6,6 +6,7 @@ use App\Enums\DispatchPriority;
 use App\Enums\DispatchStatus;
 use App\Enums\DispatchType;
 use App\Services\DispatchCostCalculator;
+use App\Services\Triage;
 use App\Services\UnitAvailability;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,6 +32,10 @@ class Dispatch extends Model
         'pickup_address',
         'pickup_latitude',
         'pickup_longitude',
+        'location_confirmed',
+        'chief_complaint',
+        'triage',
+        'priority_note',
         'assigned_at',
         'on_scene_at',
         'completed_at',
@@ -54,6 +59,9 @@ class Dispatch extends Model
             'status' => DispatchStatus::class,
             'pickup_latitude' => 'float',
             'pickup_longitude' => 'float',
+            'location_confirmed' => 'boolean',
+            'triage' => 'array',
+            'suggested_priority' => DispatchPriority::class,
             'assigned_at' => 'datetime',
             'on_scene_at' => 'datetime',
             'completed_at' => 'datetime',
@@ -89,6 +97,12 @@ class Dispatch extends Model
 
         static::saving(function (Dispatch $dispatch) {
             $dispatch->caller_phone = Patient::normalizePhone($dispatch->caller_phone);
+
+            // Prioridad que sugiere el guion (se recalcula aquí para que no dependa de la pantalla)
+            if ($dispatch->isDirty(['chief_complaint', 'triage', 'patient_age']) && ($dispatch->chief_complaint || $dispatch->triage)) {
+                $dispatch->suggested_priority = app(Triage::class)
+                    ->evaluate($dispatch->chief_complaint, $dispatch->triage ?? [], $dispatch->patient_age)['priority'];
+            }
 
             $dispatch->syncStatusWithUnit();
 

@@ -120,13 +120,13 @@ it('el formulario solo ofrece unidades libres y avisa si se elige una ocupada', 
     servicio(['ambulance_id' => $busy->id]);
 
     Livewire::test(CreateDispatch::class)
-        ->fillForm([
+        ->fillForm(guionCompleto([
             'type' => DispatchType::Emergency,
             'priority' => DispatchPriority::High,
             'status' => DispatchStatus::Pending,
             'pickup_address' => 'La Virgen centro',
             'ambulance_id' => $busy->id,
-        ])
+        ]))
         ->call('create')
         ->assertHasFormErrors(['ambulance_id']);
 
@@ -136,13 +136,13 @@ it('el formulario solo ofrece unidades libres y avisa si se elige una ocupada', 
         ->not->toContain($broken->code);
 
     Livewire::test(CreateDispatch::class)
-        ->fillForm([
+        ->fillForm(guionCompleto([
             'type' => DispatchType::Emergency,
             'priority' => DispatchPriority::High,
             'status' => DispatchStatus::Pending,
             'pickup_address' => 'La Virgen centro',
             'ambulance_id' => $free->id,
-        ])
+        ]))
         ->call('create')
         ->assertHasNoFormErrors();
 

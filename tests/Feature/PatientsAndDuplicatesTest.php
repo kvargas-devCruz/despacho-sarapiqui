@@ -82,7 +82,7 @@ it('al crear el servicio recuerda al paciente nuevo', function () {
     $this->actingAs(User::factory()->create());
 
     Livewire::test(CreateDispatch::class)
-        ->fillForm([
+        ->fillForm(guionCompleto([
             'type' => DispatchType::Emergency,
             'priority' => DispatchPriority::High,
             'status' => DispatchStatus::Pending,
@@ -90,7 +90,7 @@ it('al crear el servicio recuerda al paciente nuevo', function () {
             'patient_national_id' => '1-1111-2222',
             'patient_name' => 'Carlos Brenes',
             'pickup_address' => 'Puerto Viejo',
-        ])
+        ]))
         ->call('create')
         ->assertHasNoFormErrors();
 
