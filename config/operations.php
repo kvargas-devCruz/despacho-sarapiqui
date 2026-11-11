@@ -83,6 +83,14 @@ return [
         'low' => (int) env('OPS_TARGET_LOW', 90),
     ],
 
+    // Datos de demostración: se revisan con `php artisan ops:production-check`
+    // y se quitan con `php artisan ops:remove-demo` antes de usar datos reales
+    'demo' => [
+        'users' => ['demo@despacho.cr', 'supervisor@despacho.cr', 'despachador@despacho.cr', 'consulta@despacho.cr'],
+        'password' => 'demo1234',
+        'public_osrm' => 'router.project-osrm.org',
+    ],
+
     // Recepción guiada de emergencias: motivos del guion con su prioridad base
     // y preguntas de sí / no que pueden subirla. El sistema sugiere la mayor.
     'intake' => [

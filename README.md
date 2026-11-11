@@ -83,6 +83,12 @@ En GitHub las pruebas corren solas en cada `git push`, con SQLite y con **MySQL 
 
 > **Nunca** correr `php artisan migrate:fresh` en producción.
 
+## Pasar a datos reales
+
+1. `php artisan ops:production-check` — revisa sin cambiar nada: modo demo, usuarios y unidades de demostración, administrador real, servidor de rutas propio, correo y https. Devuelve error mientras falte algo.
+2. `php artisan ops:remove-demo` — quita usuarios demo, unidades del simulador y los servicios, citas y pacientes de ejemplo (pide confirmación). Conserva los centros de salud y las unidades reales. Si ya hay servicios atendidos por usuarios reales, no borra nada.
+3. Con `APP_ENV=production` y `APP_DEMO=false` el simulador no corre, ni desde el mapa ni con `fleet:simulate`.
+
 ## Mantenimiento
 
 | Tarea | Cómo |
