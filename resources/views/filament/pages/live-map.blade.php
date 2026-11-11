@@ -29,6 +29,8 @@
             .lm-item-sub { font-size: .8rem; color: var(--lm-muted); }
             .lm-item .lm-dot { margin-top: .35rem; }
 
+            .lm-gps { position: absolute; top: -6px; right: -10px; background: #16a34a; color: #fff; border: 2px solid #fff;
+                border-radius: 9999px; padding: 1px 4px; font: 800 8px/1.2 system-ui, sans-serif; letter-spacing: .3px; }
             .lm-unit { position: relative; width: 34px; height: 34px; border-radius: 9999px; background: var(--c);
                        border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.45); display: flex; align-items: center;
                        justify-content: center; color: #fff; font: 700 12px/1 system-ui, sans-serif; }
@@ -92,7 +94,7 @@
         className: '',
         iconSize: [34, 34],
         iconAnchor: [17, 17],
-        html: `<div class="lm-unit ${['en_route', 'on_scene'].includes(u.status) ? 'lm-pulse' : ''}" style="--c:${u.color}">${esc(u.code.split('-').pop())}</div>`,
+        html: `<div class="lm-unit ${['en_route', 'on_scene'].includes(u.status) ? 'lm-pulse' : ''}" style="--c:${u.color}">${esc(u.code.split('-').pop())}${u.liveGps ? '<span class="lm-gps">GPS</span>' : ''}</div>`,
     });
 
     const unitPopup = (u) => `
@@ -108,7 +110,7 @@
             ` : ''}
             <hr>
             <div class="lm-muted">
-                ${u.speed !== null ? `${u.speed} km/h · ` : ''}Señal ${esc(u.updated ?? 'sin datos')}
+                ${u.liveGps ? '<b style="color:#16a34a">GPS real del celular</b> · ' : ''}${u.speed !== null ? `${u.speed} km/h · ` : ''}Señal ${esc(u.updated ?? 'sin datos')}
             </div>
         </div>`;
 

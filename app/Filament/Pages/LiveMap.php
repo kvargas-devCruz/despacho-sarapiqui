@@ -68,6 +68,7 @@ class LiveMap extends Page
                 'type' => $unit->type->getLabel(),
                 'speed' => $unit->speed ? round($unit->speed) : null,
                 'updated' => $unit->last_location_at?->diffForHumans(),
+                'liveGps' => $unit->hasLiveGps(),
                 'dispatch' => $unit->activeDispatch ? [
                     'code' => $unit->activeDispatch->code,
                     'type' => $unit->activeDispatch->type->getLabel(),
