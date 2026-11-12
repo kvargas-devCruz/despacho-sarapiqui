@@ -12,6 +12,7 @@ class Hospital extends Model
         'short_name',
         'address',
         'phone',
+        'email',
         'latitude',
         'longitude',
     ];

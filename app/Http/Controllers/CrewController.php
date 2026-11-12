@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Ambulance;
 use App\Models\AmbulanceLocation;
 use App\Models\Dispatch;
+use App\Models\DispatchDocument;
 use App\Services\Crew\CrewWorkflow;
+use App\Services\Transfers\TransferDocuments;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +21,8 @@ use Illuminate\View\View;
  */
 class CrewController extends Controller
 {
+    public const RECEIVER_ROLES = ['Médico', 'Enfermería', 'Admisión', 'Otro'];
+
     public function __construct(private CrewWorkflow $workflow) {}
 
     public function show(string $token): View
@@ -117,6 +121,57 @@ class CrewController extends Controller
         return response()->json($this->payload($unit->fresh()));
     }
 
+    /** Firma de recibido del hospital */
+    public function receive(Request $request, string $token): JsonResponse
+    {
+        $unit = $this->unit($token);
+
+        $data = $request->validate([
+            'dispatch' => ['required', 'integer'],
+            'name' => ['required', 'string', 'min:3', 'max:120'],
+            'role' => ['required', 'string', 'in:' . implode(',', self::RECEIVER_ROLES)],
+            'signature' => ['required', 'string', 'max:700000'],
+        ], [
+            'name.required' => 'Escriba el nombre de quien recibe.',
+            'role.required' => 'Elija el puesto de quien recibe.',
+            'signature.required' => 'Falta la firma.',
+        ]);
+
+        try {
+            $this->workflow->receive($unit, (int) $data['dispatch'], $data['name'], $data['role'], $data['signature']);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => $e->getMessage()] + $this->payload($unit->fresh()), 422);
+        }
+
+        return response()->json($this->payload($unit->fresh()));
+    }
+
+    /** Foto o PDF de la orden médica desde el celular */
+    public function document(Request $request, string $token): JsonResponse
+    {
+        $unit = $this->unit($token);
+
+        $data = $request->validate([
+            'dispatch' => ['required', 'integer'],
+            'type' => ['required', 'in:' . implode(',', array_keys(DispatchDocument::TYPES))],
+            'file' => ['required', 'file', 'max:' . TransferDocuments::MAX_KB, 'mimetypes:' . implode(',', TransferDocuments::MIMES)],
+        ], [
+            'file.max' => 'El archivo pesa más de 10 MB.',
+            'file.mimetypes' => 'Solo fotos o PDF.',
+        ]);
+
+        $dispatch = Dispatch::whereKey($data['dispatch'])->where('ambulance_id', $unit->id)
+            ->whereIn('status', ['assigned', 'in_progress'])->first();
+
+        if (! $dispatch) {
+            return response()->json(['message' => 'El servicio ya no está asignado a esta unidad.'] + $this->payload($unit), 409);
+        }
+
+        app(TransferDocuments::class)->store($dispatch, $request->file('file'), $data['type'], 'crew');
+
+        return response()->json($this->payload($unit->fresh()));
+    }
+
     /** Manifiesto para instalar la app con el enlace de esta unidad */
     public function manifest(string $token): JsonResponse
     {
@@ -176,6 +231,7 @@ class CrewController extends Controller
                 'key' => $key,
                 'label' => CrewWorkflow::STEPS[$key]['done'],
             ])->all() : [],
+            'receiver_roles' => self::RECEIVER_ROLES,
             'reasons' => collect(config('operations.crew_reject_reasons'))->map(fn (array $r, string $key) => ['key' => $key, 'label' => $r['label']])->values()->all(),
             'server_time' => now()->toIso8601String(),
         ];
@@ -213,6 +269,9 @@ class CrewController extends Controller
                 'longitude' => $dispatch->hospital->longitude,
             ] : null,
             'assigned_at' => $dispatch->assigned_at?->format('H:i'),
+            'documents' => $dispatch->documents()->get()->map(fn (DispatchDocument $d) => $d->typeLabel())->all(),
+            'received_by' => $dispatch->received_at ? "{$dispatch->received_by_name} ({$dispatch->received_by_role})" : null,
+            'hospital_notified' => $dispatch->hospital_notified_at !== null,
         ];
     }
 }

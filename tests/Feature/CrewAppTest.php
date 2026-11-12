@@ -35,6 +35,11 @@ function unidadConApp(): Ambulance
     return $unit->fresh();
 }
 
+function firmaDePrueba(): string
+{
+    return 'data:image/png;base64,' . base64_encode("\x89PNG\r\n\x1a\n" . random_bytes(3000));
+}
+
 function servicioAsignado(Ambulance $unit, bool $hospital = true): Dispatch
 {
     return Dispatch::create([
@@ -124,6 +129,13 @@ it('recorre los pasos del servicio con hospital y guarda horas y bitácora', fun
 
     expect($dispatch->fresh()->status)->toBe(DispatchStatus::InProgress)
         ->and($dispatch->fresh()->on_scene_at)->not->toBeNull();
+
+    // Sin la firma del hospital no se puede terminar
+    $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'finish'])->assertStatus(409)->assertJsonPath('next.key', 'receive');
+
+    $this->postJson("/unidad/{$unit->crew_token}/recibido", [
+        'dispatch' => $dispatch->id, 'name' => 'Dra. Carmen Solís', 'role' => 'Médico', 'signature' => firmaDePrueba(),
+    ])->assertOk()->assertJsonPath('next.key', 'finish');
 
     $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'finish'])
         ->assertOk()

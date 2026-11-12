@@ -32,6 +32,12 @@ class HospitalForm
                             ->tel()
                             ->maxLength(20),
 
+                        TextInput::make('email')
+                            ->label('Correo de emergencias')
+                            ->helperText('Recibe el aviso cuando una unidad sale hacia el hospital con un paciente.')
+                            ->email()
+                            ->maxLength(150),
+
                         TextInput::make('address')
                             ->label('Dirección')
                             ->maxLength(255)

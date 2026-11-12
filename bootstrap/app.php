@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // La app de tripulación se autentica con el enlace privado de la unidad
         // (sin sesión), así que no lleva token CSRF
         $middleware->validateCsrfTokens(except: ['unidad/*']);
+
+        // Sin sesión, las páginas internas (documentos, hoja de traslado) mandan al inicio de sesión del panel
+        $middleware->redirectGuestsTo(fn () => route('filament.admin.auth.login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

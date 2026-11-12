@@ -36,6 +36,10 @@ return [
     // Bitácora del servicio: se escribe sola y no se edita
     'dispatch_events' => ['view' => $all],
 
+    // Documentos del traslado (orden médica, epicrisis): datos de salud,
+    // no los ve el rol de solo consulta
+    'dispatch_documents' => ['view' => $operations, 'create' => $operations, 'delete' => $management],
+
     // Métricas de tiempos de respuesta
     'metrics' => ['view' => $all],
 

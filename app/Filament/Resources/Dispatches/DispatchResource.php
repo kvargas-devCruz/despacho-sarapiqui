@@ -7,6 +7,7 @@ use App\Filament\Resources\Dispatches\Pages\CreateDispatch;
 use App\Filament\Resources\Dispatches\Pages\EditDispatch;
 use App\Filament\Resources\Dispatches\Pages\ListDispatches;
 use App\Filament\Resources\Dispatches\Pages\ViewDispatch;
+use App\Filament\Resources\Dispatches\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Dispatches\RelationManagers\EventsRelationManager;
 use App\Filament\Resources\Dispatches\Schemas\DispatchForm;
 use App\Filament\Resources\Dispatches\Tables\DispatchesTable;
@@ -66,6 +67,7 @@ class DispatchResource extends Resource
     {
         return [
             EventsRelationManager::class,
+            DocumentsRelationManager::class,
         ];
     }
 

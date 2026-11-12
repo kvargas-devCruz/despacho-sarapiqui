@@ -9,6 +9,8 @@ use App\Filament\Resources\Dispatches\DispatchResource;
 use App\Models\Ambulance;
 use App\Models\Dispatch;
 use App\Models\User;
+use App\Services\Transfers\HospitalNotifier;
+use App\Services\Transfers\TransferDocuments;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +32,7 @@ class CrewWorkflow
         'arrive' => ['label' => 'Llegamos a la escena', 'done' => 'En la escena'],
         'transport' => ['label' => 'Salimos hacia el hospital', 'done' => 'Trasladando al paciente'],
         'hospital' => ['label' => 'Llegamos al hospital', 'done' => 'En el hospital'],
+        'receive' => ['label' => 'Firma de recibido', 'done' => 'Paciente entregado con firma'],
         'finish' => ['label' => 'Terminar el servicio', 'done' => 'Servicio terminado'],
     ];
 
@@ -48,7 +51,7 @@ class CrewWorkflow
             AmbulanceStatus::EnRoute => 'arrive',
             AmbulanceStatus::OnScene => $dispatch->hospital_id ? 'transport' : 'finish',
             AmbulanceStatus::Transporting => 'hospital',
-            AmbulanceStatus::AtHospital => 'finish',
+            AmbulanceStatus::AtHospital => $dispatch->received_at ? 'finish' : 'receive',
             default => $dispatch->status === DispatchStatus::InProgress
                 ? ($dispatch->hospital_id ? 'transport' : 'finish')
                 : 'depart',
@@ -59,7 +62,7 @@ class CrewWorkflow
     public function stepsFor(Dispatch $dispatch): array
     {
         return $dispatch->hospital_id
-            ? ['accept', 'depart', 'arrive', 'transport', 'hospital', 'finish']
+            ? ['accept', 'depart', 'arrive', 'transport', 'hospital', 'receive', 'finish']
             : ['accept', 'depart', 'arrive', 'finish'];
     }
 
@@ -73,7 +76,7 @@ class CrewWorkflow
             $unit = Ambulance::whereKey($unit->id)->lockForUpdate()->firstOrFail();
             $dispatch = Dispatch::whereKey($dispatchId)->where('ambulance_id', $unit->id)->lockForUpdate()->first();
 
-            if (! $dispatch || $this->next($unit, $dispatch) !== $step) {
+            if (! $dispatch || $step === 'receive' || $this->next($unit, $dispatch) !== $step) {
                 throw ValidationException::withMessages([
                     'step' => 'Este paso ya no aplica: el servicio cambió. La pantalla se actualizó.',
                 ]);
@@ -109,7 +112,27 @@ class CrewWorkflow
                 $dispatch->events()->reorder()->latest('id')->first()?->update(['note' => $note]);
             }
 
+            // Sale con el paciente: se avisa al hospital con la hora estimada
+            if ($step === 'transport') {
+                app(HospitalNotifier::class)->patientOnTheWay($dispatch->fresh(['hospital']), $unit->fresh());
+            }
+
             return $dispatch->fresh(['hospital', 'patient']);
+        });
+    }
+
+    /** Firma de quien recibe al paciente en el hospital */
+    public function receive(Ambulance $unit, int $dispatchId, string $name, string $role, string $signature): Dispatch
+    {
+        return DB::transaction(function () use ($unit, $dispatchId, $name, $role, $signature) {
+            $unit = Ambulance::whereKey($unit->id)->lockForUpdate()->firstOrFail();
+            $dispatch = Dispatch::whereKey($dispatchId)->where('ambulance_id', $unit->id)->lockForUpdate()->first();
+
+            if (! $dispatch || $this->next($unit, $dispatch) !== 'receive') {
+                throw ValidationException::withMessages(['step' => 'La firma se pide al llegar al hospital.']);
+            }
+
+            return app(TransferDocuments::class)->receive($dispatch, $name, $role, $signature);
         });
     }
 

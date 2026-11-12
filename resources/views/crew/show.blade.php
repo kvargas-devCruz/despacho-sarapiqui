@@ -85,6 +85,21 @@
         .reason { min-height:56px; border-radius:14px; border:1px solid var(--line); background:var(--card2); color:var(--ink); font-family:inherit; font-size:16px; font-weight:600; text-align:left; padding:0 16px; }
         .reason.cancel { background:none; text-align:center; color:var(--muted); }
         .ask { text-align:center; font-weight:800; font-size:15px; color:#fde68a; margin:0 0 10px; }
+        .docs { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+        .doc { background:rgba(20,184,166,.12); border:1px solid rgba(20,184,166,.35); color:#99f6e4; border-radius:999px; padding:5px 10px; font-size:13px; font-weight:600; }
+        .upload { margin-top:12px; display:flex; align-items:center; justify-content:center; gap:8px; min-height:52px; border-radius:14px; border:1px dashed var(--brand); color:var(--brand); font-weight:700; font-size:15px; }
+        .upload input { display:none; }
+        .notice { margin-top:10px; font-size:13px; color:#a7f3d0; }
+        .field { display:flex; flex-direction:column; gap:6px; }
+        .field label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
+        .field input { min-height:50px; border-radius:12px; border:1px solid var(--line); background:var(--card2); color:var(--ink); font-family:inherit; font-size:16px; padding:0 14px; }
+        .roles { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+        .role { min-height:46px; border-radius:12px; border:1px solid var(--line); background:var(--card2); color:var(--ink); font-family:inherit; font-size:15px; font-weight:600; }
+        .role.on { border-color:var(--brand); background:rgba(20,184,166,.18); color:#ccfbf1; }
+        .pad { position:relative; background:#f8fafc; border-radius:14px; height:190px; touch-action:none; }
+        .pad canvas { width:100%; height:100%; display:block; border-radius:14px; }
+        .pad .clear { position:absolute; top:8px; right:8px; border:0; background:#e2e8f0; color:#334155; border-radius:8px; padding:6px 10px; font-family:inherit; font-size:13px; font-weight:600; }
+        .pad .line { position:absolute; left:16px; right:16px; bottom:38px; border-bottom:1px dashed #94a3b8; pointer-events:none; }
         [hidden] { display:none !important; }
     </style>
 </head>
@@ -151,6 +166,30 @@
             <div class="alerts" id="alerts"></div>
             <div class="desc" id="desc"></div>
             <div class="care" id="care" hidden></div>
+            <div class="docs" id="docs"></div>
+            <label class="upload" id="upload">
+                <input type="file" id="file" accept="image/*,application/pdf" capture="environment">
+                📷 <span id="upload-text">Fotografiar la orden médica</span>
+            </label>
+        </section>
+
+        <section class="card" id="receive-card" hidden>
+            <div class="label">Entrega del paciente</div>
+            <div class="patient" style="margin-bottom:12px">Firma de quien recibe en el hospital</div>
+            <div style="display:flex; flex-direction:column; gap:12px">
+                <div class="field">
+                    <label for="rname">Nombre completo</label>
+                    <input id="rname" autocomplete="off" placeholder="Ej: Dra. Carmen Solís">
+                </div>
+                <div class="field">
+                    <label>Puesto</label>
+                    <div class="roles" id="roles"></div>
+                </div>
+                <div class="field">
+                    <label>Firma con el dedo</label>
+                    <div class="pad"><canvas id="pad"></canvas><div class="line"></div><button type="button" class="clear" id="pad-clear">Borrar</button></div>
+                </div>
+            </div>
         </section>
 
         <section class="card" id="hospital-card" hidden>
@@ -171,6 +210,7 @@
             </div>
         </div>
         <button type="button" class="go" id="go" hidden></button>
+        <button type="button" class="go" id="receive-go" hidden>Guardar firma de recibido</button>
         <p class="hint" id="dock-hint">Mantenga la app abierta para compartir la ubicación con el despacho.</p>
     </div>
 
@@ -180,6 +220,8 @@
             location: @js(route('crew.location', $token)),
             advance: @js(route('crew.advance', $token)),
             reject: @js(route('crew.reject', $token)),
+            receive: @js(route('crew.receive', $token)),
+            document: @js(route('crew.document', $token)),
         };
         let state = @js($state);
         let lastDispatchId = state.dispatch ? state.dispatch.id : null;
@@ -259,18 +301,27 @@
                 $('desc').textContent = d.description || '';
                 $('care').hidden = ! d.care_notes;
                 $('care').textContent = d.care_notes ? 'Cuidados: ' + d.care_notes : '';
-                $('hospital').textContent = d.hospital ? d.hospital.name : '';
+                $('hospital').textContent = d.hospital ? d.hospital.name + (d.hospital_notified ? ' · avisado ✓' : '') : '';
 
                 const current = state.next ? state.steps.findIndex((s) => s.key === state.next.key) : state.steps.length;
                 $('steps').innerHTML = state.steps.map((s, i) => `<div class="${i < current ? 'done' : (i === current ? 'now' : '')}"></div>`).join('');
                 $('step-now').textContent = current > 0 ? state.steps[current - 1].label : 'Nuevo servicio: revise los datos y acepte';
             }
 
+            const receiving = state.next && state.next.key === 'receive';
+            $('receive-card').hidden = ! receiving;
+            $('receive-go').hidden = ! receiving;
+            if (receiving) { setupPad(); renderRoles(); }
+            if (d) {
+                $('docs').innerHTML = (d.documents || []).map((x) => `<span class="doc">✓ ${esc(x)}</span>`).join('');
+                $('upload-text').textContent = (d.documents || []).length ? 'Agregar otra foto o documento' : 'Fotografiar la orden médica';
+            }
             const deciding = state.next && state.next.key === 'accept';
             $('decide-wrap').hidden = ! deciding;
             $('dock-hint').hidden = deciding;
             const go = $('go');
-            go.hidden = ! state.next || deciding;
+            go.hidden = ! state.next || deciding || receiving;
+            $('dock-hint').hidden = deciding || receiving;
             if (state.next && ! confirmTimer) { go.textContent = state.next.label; go.classList.remove('confirm'); }
 
             drawMap();
@@ -375,6 +426,67 @@
             if (! b) return;
             $('sheet').hidden = true;
             post(URLS.reject, { dispatch: state.dispatch.id, reason: b.dataset.key }, 'Listo: el despacho asignará otra unidad.');
+        });
+
+        // ── Orden médica desde la cámara ───────────────────
+        $('file').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (! file || ! state.dispatch) return;
+            if (file.size > 10 * 1024 * 1024) { toast('El archivo pesa más de 10 MB.'); return; }
+            const form = new FormData();
+            form.append('dispatch', state.dispatch.id);
+            form.append('type', (state.dispatch.documents || []).length ? 'other' : 'medical_order');
+            form.append('file', file);
+            $('upload-text').textContent = 'Subiendo…';
+            try {
+                const res = await fetch(URLS.document, { method: 'POST', headers: { Accept: 'application/json' }, body: form });
+                const data = await res.json();
+                if (res.ok) { toast('Documento guardado en el servicio.'); apply(data); }
+                else toast(data.message || 'No se pudo subir el documento.');
+            } catch (err) { toast('Sin señal: intente de nuevo.'); }
+            e.target.value = '';
+            render();
+        });
+
+        // ── Firma de recibido ───────────────────────────────
+        let padReady = false, drawing = false, strokes = 0, role = null;
+        function setupPad() {
+            const c = $('pad');
+            if (padReady && c.width) return;
+            const ratio = window.devicePixelRatio || 1;
+            const rect = c.getBoundingClientRect();
+            if (! rect.width) { setTimeout(setupPad, 100); return; }
+            c.width = rect.width * ratio; c.height = rect.height * ratio;
+            const ctx = c.getContext('2d');
+            ctx.scale(ratio, ratio); ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0f172a';
+            const pos = (e) => { const r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+            c.onpointerdown = (e) => { drawing = true; strokes++; c.setPointerCapture(e.pointerId); const [x, y] = pos(e); ctx.beginPath(); ctx.moveTo(x, y); };
+            c.onpointermove = (e) => { if (! drawing) return; const [x, y] = pos(e); ctx.lineTo(x, y); ctx.stroke(); };
+            c.onpointerup = c.onpointercancel = () => (drawing = false);
+            padReady = true;
+        }
+        $('pad-clear').addEventListener('click', () => { const c = $('pad'); c.getContext('2d').clearRect(0, 0, c.width, c.height); strokes = 0; });
+        function renderRoles() {
+            $('roles').innerHTML = (state.receiver_roles || []).map((r) => `<button type="button" class="role ${r === role ? 'on' : ''}" data-role="${esc(r)}">${esc(r)}</button>`).join('');
+        }
+        $('roles').addEventListener('click', (e) => { const b = e.target.closest('[data-role]'); if (! b) return; role = b.dataset.role; renderRoles(); });
+        $('receive-go').addEventListener('click', async () => {
+            const name = $('rname').value.trim();
+            if (name.length < 3) { toast('Escriba el nombre de quien recibe.'); return; }
+            if (! role) { toast('Elija el puesto de quien recibe.'); return; }
+            if (strokes === 0) { toast('Falta la firma.'); return; }
+            if (busy) return;
+            busy = true; $('receive-go').disabled = true;
+            try {
+                const res = await fetch(URLS.receive, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ dispatch: state.dispatch.id, name, role, signature: $('pad').toDataURL('image/png') }),
+                });
+                const data = await res.json();
+                if (res.ok) { toast('Firma guardada. Ya puede terminar el servicio.'); $('rname').value = ''; role = null; strokes = 0; padReady = false; apply(data); }
+                else toast(data.message || 'No se pudo guardar la firma.');
+            } catch (err) { toast('Sin señal: intente de nuevo.'); }
+            finally { busy = false; $('receive-go').disabled = false; }
         });
 
         // ── GPS real ───────────────────────────────────────

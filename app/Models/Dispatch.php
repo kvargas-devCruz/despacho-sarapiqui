@@ -38,6 +38,11 @@ class Dispatch extends Model
         'priority_note',
         'assigned_at',
         'accepted_at',
+        'received_by_name',
+        'received_by_role',
+        'received_signature_path',
+        'received_at',
+        'hospital_notified_at',
         'on_scene_at',
         'completed_at',
         'cancelled_at',
@@ -65,6 +70,8 @@ class Dispatch extends Model
             'suggested_priority' => DispatchPriority::class,
             'assigned_at' => 'datetime',
             'accepted_at' => 'datetime',
+            'received_at' => 'datetime',
+            'hospital_notified_at' => 'datetime',
             'on_scene_at' => 'datetime',
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
@@ -236,6 +243,11 @@ class Dispatch extends Model
             'user_id' => Auth::id(),
             'note' => $note,
         ]);
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(DispatchDocument::class)->latest('id');
     }
 
     public function events(): HasMany
