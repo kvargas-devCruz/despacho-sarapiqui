@@ -79,7 +79,7 @@ it('muestra el servicio asignado con lo que la tripulación necesita', function 
         ->assertJsonPath('dispatch.complaint', 'Dificultad para respirar')
         ->assertJsonPath('dispatch.alerts.0', 'No respira con normalidad')
         ->assertJsonPath('dispatch.hospital.name', 'Hospital de Guápiles')
-        ->assertJsonPath('next.key', 'depart');
+        ->assertJsonPath('next.key', 'accept');
 });
 
 it('sin servicio queda esperando', function () {
@@ -114,6 +114,9 @@ it('recorre los pasos del servicio con hospital y guarda horas y bitácora', fun
     $dispatch = servicioAsignado($unit);
     $url = "/unidad/{$unit->crew_token}/paso";
 
+    $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'accept'])->assertOk()->assertJsonPath('next.key', 'depart');
+    expect($dispatch->fresh()->accepted_at)->not->toBeNull();
+
     foreach (['depart' => AmbulanceStatus::EnRoute, 'arrive' => AmbulanceStatus::OnScene, 'transport' => AmbulanceStatus::Transporting, 'hospital' => AmbulanceStatus::AtHospital] as $step => $status) {
         $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => $step])->assertOk();
         expect($unit->fresh()->status)->toBe($status);
@@ -141,6 +144,7 @@ it('sin hospital de destino se termina en la escena', function () {
     $dispatch = servicioAsignado($unit, hospital: false);
     $url = "/unidad/{$unit->crew_token}/paso";
 
+    $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'accept'])->assertOk();
     $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'depart'])->assertOk();
     $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'arrive'])->assertOk()->assertJsonPath('next.key', 'finish');
     $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'finish'])->assertOk();
@@ -153,6 +157,8 @@ it('un doble toque no salta pasos', function () {
     $dispatch = servicioAsignado($unit);
     $url = "/unidad/{$unit->crew_token}/paso";
 
+    $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'depart'])->assertStatus(409);   // primero se acepta
+    $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'accept'])->assertOk();
     $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'depart'])->assertOk();
     $this->postJson($url, ['dispatch' => $dispatch->id, 'step' => 'depart'])
         ->assertStatus(409)
@@ -166,9 +172,63 @@ it('una unidad no puede mover el servicio de otra', function () {
     $other = Ambulance::create(['code' => 'SAR-02', 'plate' => 'AMB-1102', 'type' => AmbulanceType::Basic, 'status' => AmbulanceStatus::Available]);
     $dispatch = servicioAsignado($other);
 
-    $this->postJson("/unidad/{$mine->crew_token}/paso", ['dispatch' => $dispatch->id, 'step' => 'depart'])->assertStatus(409);
+    $this->postJson("/unidad/{$mine->crew_token}/paso", ['dispatch' => $dispatch->id, 'step' => 'accept'])->assertStatus(409);
+    $this->postJson("/unidad/{$mine->crew_token}/rechazar", ['dispatch' => $dispatch->id, 'reason' => 'mechanical'])->assertStatus(409);
 
     expect($other->fresh()->status)->toBe(AmbulanceStatus::Available);
+});
+
+it('si no pueden ir, el servicio vuelve a pendiente y el despacho recibe el aviso', function () {
+    $dispatcher = User::factory()->create(['role' => UserRole::Dispatcher]);
+    $viewer = User::factory()->create(['role' => UserRole::Viewer]);
+    $unit = unidadConApp();
+    $dispatch = servicioAsignado($unit);
+
+    $this->postJson("/unidad/{$unit->crew_token}/rechazar", ['dispatch' => $dispatch->id, 'reason' => 'mechanical'])
+        ->assertOk()
+        ->assertJsonPath('dispatch', null);
+
+    $dispatch->refresh();
+    expect($dispatch->status)->toBe(DispatchStatus::Pending)
+        ->and($dispatch->ambulance_id)->toBeNull()
+        ->and($unit->fresh()->status)->toBe(AmbulanceStatus::OutOfService)
+        ->and($dispatch->events()->pluck('note')->implode(' '))->toContain('no puede atender: Falla mecánica');
+
+    expect($dispatcher->notifications()->count())->toBe(1)
+        ->and($dispatcher->notifications()->first()->data['title'])->toBe("SAR-01 no puede atender {$dispatch->code}")
+        ->and($viewer->notifications()->count())->toBe(0);
+});
+
+it('si están ocupados en la calle la unidad sigue disponible', function () {
+    $unit = unidadConApp();
+    $dispatch = servicioAsignado($unit);
+
+    $this->postJson("/unidad/{$unit->crew_token}/rechazar", ['dispatch' => $dispatch->id, 'reason' => 'busy'])->assertOk();
+
+    expect($unit->fresh()->status)->toBe(AmbulanceStatus::Available);
+});
+
+it('al aceptar se avisa al despacho y ya no se puede rechazar', function () {
+    $dispatcher = User::factory()->create(['role' => UserRole::Dispatcher]);
+    $unit = unidadConApp();
+    $dispatch = servicioAsignado($unit);
+
+    $this->postJson("/unidad/{$unit->crew_token}/paso", ['dispatch' => $dispatch->id, 'step' => 'accept'])->assertOk();
+    $this->postJson("/unidad/{$unit->crew_token}/rechazar", ['dispatch' => $dispatch->id, 'reason' => 'busy'])->assertStatus(409);
+
+    expect($dispatcher->notifications()->first()->data['title'])->toBe("SAR-01 aceptó {$dispatch->code}")
+        ->and($dispatch->fresh()->ambulance_id)->toBe($unit->id);
+});
+
+it('si el despacho cambia la unidad, la nueva tripulación tiene que aceptar', function () {
+    $unit = unidadConApp();
+    $dispatch = servicioAsignado($unit);
+    $this->postJson("/unidad/{$unit->crew_token}/paso", ['dispatch' => $dispatch->id, 'step' => 'accept'])->assertOk();
+
+    $other = Ambulance::create(['code' => 'SAR-02', 'plate' => 'AMB-1102', 'type' => AmbulanceType::Basic, 'status' => AmbulanceStatus::Available]);
+    $dispatch->refresh()->update(['ambulance_id' => $other->id]);
+
+    expect($dispatch->fresh()->accepted_at)->toBeNull();
 });
 
 it('un enlace nuevo anula el anterior', function () {

@@ -76,6 +76,15 @@
         .marker-unit { width:34px; height:34px; border-radius:50%; background:var(--brand); border:3px solid #fff; box-shadow:0 2px 10px rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; color:#042f2e; font:800 10px/1 system-ui; }
         .marker-pin { width:20px; height:20px; border-radius:50%; background:#ef4444; border:3px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.5); }
         .marker-hosp { width:26px; height:26px; border-radius:7px; background:#fff; border:2px solid #ef4444; color:#ef4444; display:flex; align-items:center; justify-content:center; font:900 16px/1 system-ui; }
+        .decide { display:grid; grid-template-columns:1fr 1.4fr; gap:10px; max-width:560px; margin:0 auto; }
+        .no { min-height:68px; border-radius:18px; border:2px solid rgba(239,68,68,.6); background:rgba(239,68,68,.12); color:#fecaca; font-family:inherit; font-size:17px; font-weight:800; }
+        .yes { min-height:68px; border-radius:18px; border:0; background:var(--low); color:#052e16; font-family:inherit; font-size:19px; font-weight:800; box-shadow:0 10px 30px rgba(34,197,94,.35); }
+        .sheet { position:fixed; inset:0; z-index:3000; background:rgba(2,6,23,.75); display:flex; align-items:flex-end; }
+        .sheet-body { width:100%; background:var(--card); border-top-left-radius:22px; border-top-right-radius:22px; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:10px; }
+        .sheet-body h2 { margin:0 0 4px; font-size:18px; }
+        .reason { min-height:56px; border-radius:14px; border:1px solid var(--line); background:var(--card2); color:var(--ink); font-family:inherit; font-size:16px; font-weight:600; text-align:left; padding:0 16px; }
+        .reason.cancel { background:none; text-align:center; color:var(--muted); }
+        .ask { text-align:center; font-weight:800; font-size:15px; color:#fde68a; margin:0 0 10px; }
         [hidden] { display:none !important; }
     </style>
 </head>
@@ -89,6 +98,14 @@
     </header>
 
     <div class="toast" id="toast"></div>
+
+    <div class="sheet" id="sheet" hidden>
+        <div class="sheet-body">
+            <h2>¿Por qué no pueden atenderlo?</h2>
+            <div id="reasons" style="display:flex; flex-direction:column; gap:10px"></div>
+            <button type="button" class="reason cancel" id="sheet-cancel">Volver</button>
+        </div>
+    </div>
 
     <main>
         <div class="banner" id="banner">Nuevo servicio asignado</div>
@@ -146,6 +163,13 @@
     </main>
 
     <div class="dock">
+        <div id="decide-wrap" hidden>
+            <p class="ask">¿Pueden atender este servicio?</p>
+            <div class="decide">
+                <button type="button" class="no" id="no">No podemos</button>
+                <button type="button" class="yes" id="yes">Aceptar</button>
+            </div>
+        </div>
         <button type="button" class="go" id="go" hidden></button>
         <p class="hint" id="dock-hint">Mantenga la app abierta para compartir la ubicación con el despacho.</p>
     </div>
@@ -155,6 +179,7 @@
             state: @js(route('crew.state', $token)),
             location: @js(route('crew.location', $token)),
             advance: @js(route('crew.advance', $token)),
+            reject: @js(route('crew.reject', $token)),
         };
         let state = @js($state);
         let lastDispatchId = state.dispatch ? state.dispatch.id : null;
@@ -238,11 +263,14 @@
 
                 const current = state.next ? state.steps.findIndex((s) => s.key === state.next.key) : state.steps.length;
                 $('steps').innerHTML = state.steps.map((s, i) => `<div class="${i < current ? 'done' : (i === current ? 'now' : '')}"></div>`).join('');
-                $('step-now').textContent = current > 0 ? state.steps[current - 1].label : 'Servicio asignado: confirme la salida';
+                $('step-now').textContent = current > 0 ? state.steps[current - 1].label : 'Nuevo servicio: revise los datos y acepte';
             }
 
+            const deciding = state.next && state.next.key === 'accept';
+            $('decide-wrap').hidden = ! deciding;
+            $('dock-hint').hidden = deciding;
             const go = $('go');
-            go.hidden = ! state.next;
+            go.hidden = ! state.next || deciding;
             if (state.next && ! confirmTimer) { go.textContent = state.next.label; go.classList.remove('confirm'); }
 
             drawMap();
@@ -317,6 +345,36 @@
             } finally {
                 busy = false; go.disabled = false; render();
             }
+        });
+
+        // ── Aceptar o decir que no se puede ────────────────
+        async function post(url, body, okText) {
+            if (busy) return;
+            busy = true;
+            try {
+                const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+                const data = await res.json();
+                if (res.status === 409) toast(data.message || 'El servicio cambió.');
+                else if (res.ok) toast(okText);
+                else toast(data.message || 'No se pudo enviar.');
+                if (data.unit) { lastDispatchId = data.dispatch ? data.dispatch.id : null; apply(data); }
+                if (navigator.vibrate) navigator.vibrate(80);
+            } catch (e) {
+                toast('No se pudo enviar. Revise la señal e intente de nuevo.');
+            } finally { busy = false; }
+        }
+
+        $('yes').addEventListener('click', () => post(URLS.advance, { dispatch: state.dispatch.id, step: 'accept' }, 'Aceptado: el despacho ya lo sabe.'));
+        $('no').addEventListener('click', () => {
+            $('reasons').innerHTML = (state.reasons || []).map((r) => `<button type="button" class="reason" data-key="${esc(r.key)}">${esc(r.label)}</button>`).join('');
+            $('sheet').hidden = false;
+        });
+        $('sheet-cancel').addEventListener('click', () => ($('sheet').hidden = true));
+        $('reasons').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-key]');
+            if (! b) return;
+            $('sheet').hidden = true;
+            post(URLS.reject, { dispatch: state.dispatch.id, reason: b.dataset.key }, 'Listo: el despacho asignará otra unidad.');
         });
 
         // ── GPS real ───────────────────────────────────────

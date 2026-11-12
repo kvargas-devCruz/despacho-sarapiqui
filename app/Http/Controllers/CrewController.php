@@ -98,6 +98,25 @@ class CrewController extends Controller
         return response()->json($this->payload($unit->fresh()));
     }
 
+    /** La tripulación no puede atender el servicio asignado */
+    public function reject(Request $request, string $token): JsonResponse
+    {
+        $unit = $this->unit($token);
+
+        $data = $request->validate([
+            'dispatch' => ['required', 'integer'],
+            'reason' => ['required', 'string', 'in:' . implode(',', array_keys(config('operations.crew_reject_reasons')))],
+        ]);
+
+        try {
+            $this->workflow->reject($unit, (int) $data['dispatch'], $data['reason']);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => $e->getMessage()] + $this->payload($unit->fresh()), 409);
+        }
+
+        return response()->json($this->payload($unit->fresh()));
+    }
+
     /** Manifiesto para instalar la app con el enlace de esta unidad */
     public function manifest(string $token): JsonResponse
     {
@@ -157,6 +176,7 @@ class CrewController extends Controller
                 'key' => $key,
                 'label' => CrewWorkflow::STEPS[$key]['done'],
             ])->all() : [],
+            'reasons' => collect(config('operations.crew_reject_reasons'))->map(fn (array $r, string $key) => ['key' => $key, 'label' => $r['label']])->values()->all(),
             'server_time' => now()->toIso8601String(),
         ];
     }

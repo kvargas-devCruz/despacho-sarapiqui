@@ -37,6 +37,7 @@ class Dispatch extends Model
         'triage',
         'priority_note',
         'assigned_at',
+        'accepted_at',
         'on_scene_at',
         'completed_at',
         'cancelled_at',
@@ -63,6 +64,7 @@ class Dispatch extends Model
             'triage' => 'array',
             'suggested_priority' => DispatchPriority::class,
             'assigned_at' => 'datetime',
+            'accepted_at' => 'datetime',
             'on_scene_at' => 'datetime',
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
@@ -137,6 +139,11 @@ class Dispatch extends Model
     {
         if ($this->ambulance_id && $this->status === DispatchStatus::Pending) {
             $this->status = DispatchStatus::Assigned;
+        }
+
+        // Otra unidad (o ninguna): su tripulación tiene que aceptar de nuevo
+        if ($this->isDirty('ambulance_id') && ! $this->isDirty('accepted_at')) {
+            $this->accepted_at = null;
         }
 
         if (! $this->ambulance_id && $this->status === DispatchStatus::Assigned) {

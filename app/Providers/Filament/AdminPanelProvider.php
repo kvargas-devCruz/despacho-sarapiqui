@@ -43,6 +43,9 @@ class AdminPanelProvider extends PanelProvider
                 'Administración',
             ])
             ->sidebarCollapsibleOnDesktop()
+            // Campana con avisos de la tripulación (aceptó o no puede ir)
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('10s')
             // Si un modelo no tiene policy, se niega el acceso en vez de permitirlo
             ->strictAuthorization()
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')

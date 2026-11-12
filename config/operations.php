@@ -91,6 +91,15 @@ return [
         'public_osrm' => 'router.project-osrm.org',
     ],
 
+    // Motivos para que la tripulación no acepte un servicio. 'out_of_service'
+    // deja la unidad fuera de servicio para que no se le vuelva a asignar.
+    'crew_reject_reasons' => [
+        'mechanical' => ['label' => 'Falla mecánica de la unidad', 'out_of_service' => true],
+        'crew' => ['label' => 'Tripulación incompleta', 'out_of_service' => true],
+        'supplies' => ['label' => 'Faltan equipos o insumos', 'out_of_service' => true],
+        'busy' => ['label' => 'Atendiendo otra situación en la calle', 'out_of_service' => false],
+    ],
+
     // Recepción guiada de emergencias: motivos del guion con su prioridad base
     // y preguntas de sí / no que pueden subirla. El sistema sugiere la mayor.
     'intake' => [

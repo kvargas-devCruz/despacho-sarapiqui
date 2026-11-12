@@ -26,4 +26,5 @@ Route::controller(CrewController::class)
         Route::get('/{token}/manifest.webmanifest', 'manifest')->middleware('throttle:30,1')->name('manifest');
         Route::post('/{token}/ubicacion', 'location')->middleware('throttle:60,1')->name('location');
         Route::post('/{token}/paso', 'advance')->middleware('throttle:30,1')->name('advance');
+        Route::post('/{token}/rechazar', 'reject')->middleware('throttle:10,1')->name('reject');
     });
